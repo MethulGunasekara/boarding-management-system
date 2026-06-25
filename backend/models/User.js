@@ -27,17 +27,15 @@ const userSchema = new mongoose.Schema({
 //-------------------------------------------------------------------------------------------------------------------------------------------
 
 // Pre-save hook: runs automatically right before doc.save() is executed
-userSchema.pre('save', async function(next) {
-  // If the password wasn't modified (e.g., user is just updating their email), skip hashing
+userSchema.pre('save', async function() {
+  // If the password hasn't been changed, just return and do nothing
   if (!this.isModified('password')) {
-    return next();
+    return; 
   }
   
-  // Generate a salt (random data added to the password) with a cost factor of 10
+  // Hash the password
   const salt = await bcrypt.genSalt(10);
-  // Replace the plain text password with the hashed version
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 // Instance method: allows us to call user.matchPassword('123456') in our controllers

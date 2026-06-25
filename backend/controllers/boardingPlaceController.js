@@ -119,11 +119,62 @@ const getBoardingPlaceById = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get boarding places for the logged-in owner
+ * @route   GET /boarding-places/my-places
+ * @access  Private/Owner
+ */
+const getOwnerBoardingPlaces = async (req, res) => {
+  try {
+    // req.user is populated by our JWT authentication middleware
+    const places = await BoardingPlace.find({ owner: req.user._id });
+    
+    res.status(200).json(places);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error fetching your properties', error: error.message });
+  }
+};
+
+/**
+ * @desc    Create a new boarding place (Owner self-serve)
+ * @route   POST /boarding-places
+ * @access  Private/Owner
+ */
+const ownerCreateBoardingPlace = async (req, res) => {
+  try {
+    const { name, address, capacity } = req.body;
+
+    if (!name || !address) {
+      return res.status(400).json({ message: 'Please provide a name and address for the property' });
+    }
+
+    // 1. Calculate a default 1-month trial for self-registered properties
+    const renewalDate = new Date();
+    renewalDate.setMonth(renewalDate.getMonth() + 1);
+
+    // 2. Include the required subscription fields to satisfy Mongoose
+    const newPlace = await BoardingPlace.create({
+      name,
+      address,
+      capacity: capacity || 0,
+      owner: req.user._id,
+      subscriptionStatus: 'ACTIVE', 
+      subscriptionRenewalDate: renewalDate
+    });
+
+    res.status(201).json(newPlace);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error creating property', error: error.message });
+  }
+};
+
 module.exports = { 
   createBoardingPlace, 
+  ownerCreateBoardingPlace,
   toggleSubscription, 
   getOverdueBoardingPlaces,
-  getBoardingPlaceById 
+  getBoardingPlaceById,
+  getOwnerBoardingPlaces,
 };
 
 

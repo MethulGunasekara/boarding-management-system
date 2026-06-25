@@ -5,7 +5,7 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Import the Owner-facing controllers
-const { getBoardingPlaceById } = require('../controllers/boardingPlaceController');
+const { getBoardingPlaceById,getOwnerBoardingPlaces,ownerCreateBoardingPlace } = require('../controllers/boardingPlaceController');
 const { createRoom } = require('../controllers/roomController');
 
 // 1. Apply middleware to all routes in this file
@@ -26,5 +26,19 @@ router.get('/:id', getBoardingPlaceById);
  * @access  Private (Owner Only)
  */
 router.post('/:id/rooms', createRoom);
+
+/**
+ * @route   GET /boarding-places/my-places
+ * @desc    Get boarding places for the logged-in owner
+ * @access  Private/Owner
+ */
+router.get('/my-places', protect, getOwnerBoardingPlaces);
+
+/**
+ * @route   POST /boarding-places
+ * @desc    Create a new boarding place
+ * @access  Private/Owner
+ */
+router.post('/', protect, ownerCreateBoardingPlace);
 
 module.exports = router;
