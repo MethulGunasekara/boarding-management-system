@@ -13,6 +13,13 @@ const { createRoom } = require('../controllers/roomController');
 router.use(protect, authorize('OWNER'));
 
 /**
+ * @route   GET /boarding-places/my-places
+ * @desc    Get boarding places for the logged-in owner
+ * @access  Private/Owner
+ */
+router.get('/my-places', protect, getOwnerBoardingPlaces);
+
+/**
  * @route   GET /boarding-places/:id
  * @desc    Fetch specific boarding place details for the owner dashboard
  * @access  Private (Owner Only)
@@ -26,13 +33,6 @@ router.get('/:id', getBoardingPlaceById);
  * @access  Private (Owner Only)
  */
 router.post('/:id/rooms', createRoom);
-
-/**
- * @route   GET /boarding-places/my-places
- * @desc    Get boarding places for the logged-in owner
- * @access  Private/Owner
- */
-router.get('/my-places', protect, getOwnerBoardingPlaces);
 
 /**
  * @route   POST /boarding-places

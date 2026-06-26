@@ -27,7 +27,6 @@ app.use('/boarding-places', boardingPlaceRoutes);
 app.use('/tenants', tenantRoutes);
 app.use('/costs', costRoutes);
 app.use('/portal', tenantPortalRoutes);
-app.use('/boarding-places', require('./routes/boardingPlaceRoutes'));
 app.use('/upload', require('./routes/uploadRoutes'));
 
 

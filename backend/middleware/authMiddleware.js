@@ -1,22 +1,34 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Tenant = require('../models/Tenant'); 
 
-// 1. Protect routes: Verifies the token and attaches the user to the request
+// Protect routes: Verifies the token and attaches the user/tenant to the request
 const protect = async (req, res, next) => {
   let token;
 
-  // Tokens are typically sent in the headers as: "Bearer <token>"
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-
-      // Decode the token using our secret key
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Fetch the user from the DB and attach to req object (excluding the password hash!)
-      req.user = await User.findById(decoded.id).select('-password');
+      // 2. Check the role from the token payload to query the correct model
+      if (decoded.role === 'TENANT') {
+        req.user = await Tenant.findById(decoded.id).select('-password');
+        
+        // 3. Ensure the 'role' property exists on req.user for the authorize check later
+        // (Since your Tenant schema might not have an explicit 'role' field like User does)
+        if (req.user) req.user.role = 'TENANT'; 
+      } else {
+        // Handles 'ADMIN' and 'OWNER'
+        req.user = await User.findById(decoded.id).select('-password');
+      }
+
+      // 4. Safety catch: If the ID wasn't found in either collection, reject
+      if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized, account not found' });
+      }
       
-      next(); // Move on to the next middleware or controller
+      next(); 
     } catch (error) {
       res.status(401).json({ message: 'Not authorized, token failed' });
     }
@@ -27,10 +39,10 @@ const protect = async (req, res, next) => {
   }
 };
 
-// 2. Authorize roles: Ensures the logged-in user has the correct permissions
+// Authorize roles: Ensures the logged-in user has the correct permissions
 const authorize = (...roles) => {
   return (req, res, next) => {
-    // req.user was set by the 'protect' middleware right before this ran
+    // req.user was successfully populated by 'protect'
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ 
         message: `Forbidden: User role ${req.user.role} cannot access this route` 

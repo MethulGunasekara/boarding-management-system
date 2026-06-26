@@ -58,6 +58,8 @@ const tenantSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Pre-save hook for password hashing
 tenantSchema.pre('save', async function() {
   if (!this.isModified('password')) {
     return;
@@ -65,5 +67,10 @@ tenantSchema.pre('save', async function() {
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
+
+// --- ADDED: Instance method to compare passwords ---
+tenantSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 module.exports = mongoose.model('Tenant', tenantSchema);

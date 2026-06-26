@@ -7,6 +7,12 @@ const userSchema = new mongoose.Schema({
     enum: ['ADMIN', 'OWNER'], // Restricts values to strictly these two
     required: [true, 'A valid user role is required']
   },
+  // 1. ADDED: Full Name field
+  fullName: {
+    type: String,
+    required: [true, 'Full name is required'],
+    trim: true
+  },
   email: {
     type: String,
     required: [true, 'Email is required'],
@@ -14,11 +20,14 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
+  // 2. ADDED: Contact Number field
+  contactNumber: {
+    type: String,
+    required: [true, 'Contact number is required']
+  },
   password: {
     type: String,
     required: [true, 'Password is required']
-    // Note: We will add the bcrypt password hashing middleware (pre-save hook) 
-    // when we tackle the Auth phase. Let's keep this strictly structural for now.
   }
 }, {
   timestamps: true // Automatically manages 'createdAt' and 'updatedAt' fields
@@ -42,8 +51,5 @@ userSchema.pre('save', async function() {
 userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
-
-
-
 
 module.exports = mongoose.model('User', userSchema);
