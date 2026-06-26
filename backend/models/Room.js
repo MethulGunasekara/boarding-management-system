@@ -2,23 +2,25 @@ const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
   boardingPlace: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'BoardingPlace', // Links back to the parent entity
-    required: [true, 'A room must belong to a boarding place']
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BoardingPlace',
+      required: true,
+    },
+    roomNumber: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    capacity: {
+      type: Number,
+      required: true,
+      min: [1, 'Room capacity must be at least 1'],
+    },
   },
-  roomNumber: {
-    type: String,
-    required: [true, 'Room number is required'],
-    trim: true
-  },
-  capacity: {
-    type: Number,
-    required: [true, 'Room capacity is required'],
-    min: [1, 'A room must be able to hold at least one person']
+  { 
+    timestamps: true 
   }
-}, {
-  timestamps: true
-});
+);
 
 // Compound index: Ensures roomNumber is unique ONLY within its specific boardingPlace
 roomSchema.index({ boardingPlace: 1, roomNumber: 1 }, { unique: true });

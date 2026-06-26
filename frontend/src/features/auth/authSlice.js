@@ -48,6 +48,21 @@ export const register = createAsyncThunk('auth/register', async (userData, thunk
   }
 });
 
+// Async Thunk for Tenant Registration
+export const registerTenantUser = createAsyncThunk('auth/registerTenant', async (userData, thunkAPI) => {
+  try {
+    const response = await api.post('/auth/tenant/register', userData);
+    
+    if (response.data) {
+      localStorage.setItem('userInfo', JSON.stringify(response.data));
+    }
+    return response.data;
+  } catch (error) {
+    const message = (error.response && error.response.data && error.response.data.message) || error.message;
+    return thunkAPI.rejectWithValue(message);
+  }
+});
+
 // 3. Async Thunk for Logout
 export const logout = createAsyncThunk('auth/logout', async () => {
   localStorage.removeItem('userInfo');
@@ -94,6 +109,20 @@ export const authSlice = createSlice({
         state.user = action.payload; // Set the global user state!
       })
       .addCase(register.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+        state.user = null;
+      })
+      .addCase(registerTenantUser.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(registerTenantUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.user = action.payload;
+      })
+      .addCase(registerTenantUser.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

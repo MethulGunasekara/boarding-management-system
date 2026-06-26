@@ -28,6 +28,7 @@ app.use('/tenants', tenantRoutes);
 app.use('/costs', costRoutes);
 app.use('/portal', tenantPortalRoutes);
 app.use('/boarding-places', require('./routes/boardingPlaceRoutes'));
+app.use('/upload', require('./routes/uploadRoutes'));
 
 
 // If the request made it past all the routes above without a match, it hits notFound

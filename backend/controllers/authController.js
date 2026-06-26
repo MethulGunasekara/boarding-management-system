@@ -156,4 +156,53 @@ const registerOwner = async (req, res) => {
   }
 };
 
-module.exports = { loginAdmin, loginOwner, loginTenant, registerOwner };
+/**
+ * @desc    Register a new Tenant
+ * @route   POST /auth/tenant/register
+ * @access  Public
+ */
+const registerTenant = async (req, res) => {
+  try {
+    const { fullName, email, password, contactNumber } = req.body;
+
+    // 1. Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // 2. Create the user, locking the role to TENANT
+    const user = await User.create({
+      fullName,
+      email,
+      password,
+      contactNumber,
+      role: 'TENANT' 
+    });
+
+    if (user) {
+      // 3. Generate token and log them in
+      const token = jwt.sign(
+        { id: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
+      );
+
+      res.status(201).json({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        token: token
+      });
+    } else {
+      res.status(400).json({ message: 'Invalid user data received' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server error during tenant registration', error: error.message });
+  }
+};
+
+module.exports = { loginAdmin, loginOwner, loginTenant, registerOwner, registerTenant };
+
+

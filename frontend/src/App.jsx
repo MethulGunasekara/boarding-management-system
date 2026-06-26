@@ -6,6 +6,7 @@ import AdminBoardingPlaces from './pages/AdminBoardingPlaces';
 import Register from './pages/Register';
 import OwnerDashboard from './pages/OwnerDashboard';
 import CreateProperty from './pages/CreateProperty';
+import TenantDashboard from './pages/TenantDashboard';
 
 function App() {
   return (
@@ -30,7 +31,7 @@ function App() {
             <Route path="/owner/financials" element={<div>Financials & Utilities</div>} />
 
             {/* Tenant Routes */}
-              <Route path="/portal" element={<div>Tenant Dashboard</div>} />
+              <Route path="/tenant" element={<TenantDashboard />} />
               <Route path="/portal/bills" element={<div>My Bills</div>} />
           </Route>
         </Routes>
