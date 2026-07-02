@@ -1,21 +1,36 @@
 const express = require('express');
 const router = express.Router();
 
-// Import our security middleware
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Import the tenant controller
-const { admitTenant } = require('../controllers/tenantController');
+const {
+  admitTenant,
+  getTenantById,
+  getTenantsByBoardingPlace,
+  getTenantCharges,
+  getOverdueTenants,
+  moveTenantOut
+} = require('../controllers/tenantController');
 
-// 1. Secure all tenant routes: Must be logged in AND have the 'OWNER' role
+// Secure all tenant routes
 router.use(protect, authorize('OWNER'));
 
-/**
- * @route   POST /tenants
- * @desc    Submit a new tenant admission form
- * @access  Private (Owner Only)
- */
-// The base path '/tenants' will be defined in server.js
+// POST /tenants — Admit a new tenant
 router.post('/', admitTenant);
+
+// GET /tenants/by-place/:boardingPlaceId — Get all tenants for a boarding place
+router.get('/by-place/:boardingPlaceId', getTenantsByBoardingPlace);
+
+// GET /tenants/overdue/:boardingPlaceId — Get overdue tenants for a boarding place
+router.get('/overdue/:boardingPlaceId', getOverdueTenants);
+
+// GET /tenants/:id — Get a single tenant profile
+router.get('/:id', getTenantById);
+
+// GET /tenants/:id/charges — Get all charges for a tenant
+router.get('/:id/charges', getTenantCharges);
+
+// PATCH /tenants/:id/move-out — Mark tenant as moved out
+router.patch('/:id/move-out', moveTenantOut);
 
 module.exports = router;

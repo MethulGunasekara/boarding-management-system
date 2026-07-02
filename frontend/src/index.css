@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,32 +9,96 @@
     font-family: 'Inter', system-ui, sans-serif;
     scroll-behavior: smooth;
   }
-  
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-gray-50 text-gray-900 transition-colors duration-300;
+  }
+
+  .dark body {
+    @apply bg-dark-bg text-gray-100;
   }
 }
 
-/* Custom Scrollbar for a premium feel */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #564592; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #724cf9; }
+.dark ::-webkit-scrollbar-thumb { background: #724cf9; }
+
+/* Focus styles */
+input:focus, select:focus, textarea:focus, button:focus { outline: none; }
+
+@layer components {
+  /* Gradient button — primary */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl
+           bg-gradient-to-r from-bms-blue to-bms-grape
+           hover:from-bms-grape hover:to-bms-blue
+           transition-all duration-300 shadow-lg shadow-bms-blue/30
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Ghost / outline button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl
+           border border-bms-blue/40 text-bms-blue
+           hover:bg-bms-blue/10 transition-all duration-200
+           dark:border-bms-mauve/40 dark:text-bms-mauve dark:hover:bg-bms-mauve/10;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl
+           bg-red-500 hover:bg-red-600 transition-all duration-200 shadow-lg shadow-red-500/20;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6
+           dark:bg-dark-card dark:border-dark-border;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
+           bg-white text-gray-900 placeholder-gray-400
+           focus:ring-2 focus:ring-bms-blue/40 focus:border-bms-blue transition-all
+           dark:bg-dark-bg dark:border-dark-border dark:text-gray-100 dark:placeholder-gray-500
+           dark:focus:ring-bms-mauve/40 dark:focus:border-bms-mauve;
+  }
+
+  /* Label */
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-1.5
+           dark:text-gray-300;
+  }
+
+  /* Badge */
+  .badge-active { @apply px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+  .badge-overdue { @apply px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+  .badge-pending { @apply px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+  .badge-moved-out { @apply px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400; }
+
+  /* Page header */
+  .page-title { @apply text-2xl font-bold text-gray-900 dark:text-white; }
+  .page-subtitle { @apply text-sm text-gray-500 dark:text-gray-400 mt-1; }
+
+  /* Stat card */
+  .stat-card {
+    @apply card flex items-center gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: transparent; 
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #724cf9, #ca7df9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1; 
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8; 
-}
-
-/* Remove default blue outline on focus, replace with Tailwind ring */
-input:focus, select:focus, textarea:focus, button:focus {
-  outline: none;
+/* Sidebar gradient */
+.sidebar-gradient {
+  background: linear-gradient(180deg, #130f25 0%, #0f0b1e 100%);
 }

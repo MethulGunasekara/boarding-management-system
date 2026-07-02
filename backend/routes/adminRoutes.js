@@ -1,26 +1,40 @@
 const express = require('express');
 const router = express.Router();
 
-// Import our security middleware
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { createBoardingPlace, toggleSubscription, getOverdueBoardingPlaces } = require('../controllers/boardingPlaceController');
+const User = require('../models/User');
+const BoardingPlace = require('../models/BoardingPlace');
 
-// Import the admin controllers
-const { createBoardingPlace,toggleSubscription } = require('../controllers/boardingPlaceController');
-
-/**
- * @route   POST /admin/boarding-places
- * @desc    Create a new boarding place
- * @access  Private (Admin Only)
- */
-// The request must pass through 'protect' (valid JWT) AND 'authorize' (role is ADMIN)
+// Admin: Create boarding place
 router.post('/boarding-places', protect, authorize('ADMIN'), createBoardingPlace);
 
-/**
- * @route   PATCH /admin/boarding-places/:id/subscription
- * @desc    Toggle a boarding place's subscription status
- * @access  Private (Admin Only)
- */
-// The ':id' acts as a dynamic placeholder. Express parses this into req.params.id in our controller.
+// Admin: Toggle subscription
 router.patch('/boarding-places/:id/subscription', protect, authorize('ADMIN'), toggleSubscription);
+
+// Admin: Get platform-wide overdue boarding places
+router.get('/overdue', protect, authorize('ADMIN'), getOverdueBoardingPlaces);
+
+// Admin: Get all users (owners + admins)
+router.get('/users', protect, authorize('ADMIN'), async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch users', error: error.message });
+  }
+});
+
+// Admin: Get all boarding places with owner info
+router.get('/boarding-places', protect, authorize('ADMIN'), async (req, res) => {
+  try {
+    const places = await BoardingPlace.find()
+      .populate('owner', 'fullName email contactNumber')
+      .sort({ createdAt: -1 });
+    res.json(places);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch boarding places', error: error.message });
+  }
+});
 
 module.exports = router;

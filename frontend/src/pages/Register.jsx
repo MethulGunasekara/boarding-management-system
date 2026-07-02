@@ -2,116 +2,172 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { register, reset } from '../features/auth/authSlice';
-import { UserPlus, User, Mail, Key, Phone } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLang } from '../contexts/LangContext';
+import { getT } from '../utils/translations';
+import { DoorOpen, Mail, Lock, User, Phone, Eye, EyeOff, Sun, Moon, Languages } from 'lucide-react';
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    contactNumber: ''
+    fullName: '', email: '', contactNumber: '', password: '', confirmPassword: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const { fullName, email, contactNumber, password, confirmPassword } = formData;
 
-  const { fullName, email, password, contactNumber } = formData;
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { isDark, toggleTheme } = useTheme();
+  const { lang, toggleLang } = useLang();
+  const t = getT(lang);
 
-  const { user, isLoading, isError, isSuccess, message } = useSelector((state) => state.auth);
+  const { user, isLoading, isError, isSuccess, message } = useSelector((s) => s.auth);
 
   useEffect(() => {
-    if (isError) alert(message);
-
-    // If registration is successful, they are an OWNER, so send them to the owner dashboard
-    if (isSuccess || user) {
-      navigate('/owner');
-    }
-
+    if (isError) setErrorMsg(message);
+    if (isSuccess || user) navigate('/owner');
     dispatch(reset());
   }, [user, isError, isSuccess, message, navigate, dispatch]);
 
-  const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const onChange = (e) => {
+    setErrorMsg('');
+    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+  };
 
   const onSubmit = (e) => {
     e.preventDefault();
-    dispatch(register(formData));
+    if (password !== confirmPassword) {
+      return setErrorMsg(lang === 'en' ? 'Passwords do not match.' : 'මුරපද ගැලපෙන්නේ නැත.');
+    }
+    dispatch(register({ fullName, email, contactNumber, password }));
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center text-blue-600">
-          <UserPlus size={48} />
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Partner with us
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Register as a Property Owner
-        </p>
+    <div className="min-h-screen bg-white dark:bg-dark-bg flex flex-col transition-colors duration-300">
+      {/* Top controls */}
+      <div className="flex justify-end gap-2 p-4">
+        <button
+          onClick={toggleLang}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-card transition-colors"
+        >
+          <Languages size={14} />
+          {lang === 'en' ? 'සිංහල' : 'English'}
+        </button>
+        <button
+          onClick={toggleTheme}
+          className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-card transition-colors"
+        >
+          {isDark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={onSubmit}>
-            
+      <div className="flex-1 flex items-center justify-center px-6 py-8">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-bms-blue to-bms-grape flex items-center justify-center shadow-lg">
+              <DoorOpen size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-gray-900 dark:text-white">{t('appName')}</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('appTagline')}</p>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{t('registerOwner')}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+            {lang === 'en'
+              ? 'Create your owner account to start managing your boarding house.'
+              : 'ඔබේ නවාතැන කළමනාකරණය කිරීමට ඔබේ හිමිකරු ගිණුම සාදන්න.'}
+          </p>
+
+          {errorMsg && (
+            <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm animate-fade-in">
+              {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={onSubmit} className="space-y-4">
             {/* Full Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Full Name</label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
-                </div>
-                <input type="text" name="fullName" value={fullName} onChange={onChange} required
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border" placeholder="John Doe" />
+              <label className="form-label">{t('fullName')}</label>
+              <div className="relative">
+                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text" name="fullName" value={fullName} onChange={onChange} required
+                  placeholder={lang === 'en' ? 'Your full name' : 'ඔබේ සම්පූර්ණ නම'}
+                  className="input-field pl-10"
+                />
               </div>
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email Address</label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input type="email" name="email" value={email} onChange={onChange} required
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border" placeholder="john@example.com" />
+              <label className="form-label">{t('email')}</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email" name="email" value={email} onChange={onChange} required
+                  placeholder="you@example.com"
+                  className="input-field pl-10"
+                />
               </div>
             </div>
 
             {/* Contact Number */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Contact Number</label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                </div>
-                <input type="text" name="contactNumber" value={contactNumber} onChange={onChange} required
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border" placeholder="+1 234 567 8900" />
+              <label className="form-label">{t('contactNumber')}</label>
+              <div className="relative">
+                <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="tel" name="contactNumber" value={contactNumber} onChange={onChange} required
+                  placeholder="07X XXX XXXX"
+                  className="input-field pl-10"
+                />
               </div>
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Password</label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Key className="h-5 w-5 text-gray-400" />
-                </div>
-                <input type="password" name="password" value={password} onChange={onChange} required
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border" placeholder="••••••••" />
+              <label className="form-label">{t('password')}</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'} name="password" value={password} onChange={onChange} required
+                  placeholder="Min. 6 characters"
+                  className="input-field pl-10 pr-10"
+                />
+                <button type="button" onClick={() => setShowPassword(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
-            <button type="submit" disabled={isLoading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
-              {isLoading ? 'Creating account...' : 'Create Account'}
+            {/* Confirm Password */}
+            <div>
+              <label className="form-label">{t('confirmPassword')}</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'} name="confirmPassword" value={confirmPassword} onChange={onChange} required
+                  placeholder="••••••••"
+                  className="input-field pl-10"
+                />
+              </div>
+            </div>
+
+            <button type="submit" disabled={isLoading} className="btn-primary w-full mt-2">
+              {isLoading ? t('registering') : t('register')}
             </button>
           </form>
-          
-          <div className="mt-6 text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
-            <Link to="/" className="font-medium text-blue-600 hover:text-blue-500">Sign in here</Link>
-          </div>
+
+          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            {t('alreadyHaveAccount')}{' '}
+            <Link to="/" className="text-bms-blue dark:text-bms-mauve font-semibold hover:underline">
+              {t('loginHere')}
+            </Link>
+          </p>
         </div>
       </div>
     </div>
