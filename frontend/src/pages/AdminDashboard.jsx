@@ -1,124 +1,119 @@
-import { useState, useEffect } from 'react';
-import api from '../utils/api';
-import { Users, Building, ShieldCheck, Activity } from 'lucide-react';
+import { useState, useContext, useEffect } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import axiosInstance from '../api/axiosInstance';
+import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalOwners: 0,
-    totalTenants: 0,
-    totalPlaces: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+  
+  // State containers for our three API endpoints
+  const [places, setPlaces] = useState([]);
+  const [overduePlaces, setOverduePlaces] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // We use an async function inside useEffect to fetch data
-    const fetchAdminData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        // Run both API calls at the same time for maximum performance
-        const [usersRes, placesRes] = await Promise.all([
-          api.get('/admin/users'),
-          api.get('/admin/boarding-places')
+        // Fire all 3 requests at the same time
+        const [placesRes, overdueRes, logsRes] = await Promise.all([
+          axiosInstance.get('/admin/boarding-places'),
+          axiosInstance.get('/admin/overdue'),
+          axiosInstance.get('/notifications/log')
         ]);
-
-        const users = usersRes.data;
-        const places = placesRes.data;
-
-        // Calculate our statistics
-        const owners = users.filter(u => u.role === 'OWNER').length;
-        const admins = users.filter(u => u.role === 'ADMIN').length;
-        // In a real app, we'd fetch actual tenants. For now, we'll simulate it or pull from users.
-        const tenants = users.filter(u => u.role === 'TENANT').length;
-
-        setStats({
-          totalUsers: users.length,
-          totalOwners: owners,
-          totalAdmins: admins,
-          totalTenants: tenants,
-          totalPlaces: places.length,
-        });
+        
+        // Update our state with the returned Express data
+        setPlaces(placesRes.data);
+        setOverduePlaces(overdueRes.data);
+        setLogs(logsRes.data);
       } catch (error) {
-        console.error("Failed to fetch admin data", error);
+        console.error("Dashboard fetch error:", error);
+        toast.error('Failed to load dashboard data. Check your connection.');
       } finally {
-        setIsLoading(false);
+        setLoading(false); // Stop the loading spinner regardless of success/fail
       }
     };
 
-    fetchAdminData();
+    fetchDashboardData();
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Platform Overview</h1>
-        <p className="text-gray-500 text-sm">Real-time statistics for your boarding management system.</p>
-      </div>
-
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* Card 1 */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
-            <Users size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Total Accounts</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
-          </div>
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      
+      {/* Top Navigation / Header */}
+      <header className="flex-between" style={{ marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ color: 'var(--primary)' }}>Admin Control Center</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user?.email}</p>
         </div>
+        <button onClick={logout} className="btn btn-outline">
+          Log Out
+        </button>
+      </header>
 
-        {/* Card 2 */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-green-100 text-green-600 rounded-lg">
-            <ShieldCheck size={24} />
+      {loading ? (
+        <p>Loading dashboard data...</p>
+      ) : (
+        <>
+          {/* Top-level Stat Cards */}
+          <div className="grid-2" style={{ marginBottom: '2rem' }}>
+            <div className="card">
+              <h3 style={{ color: 'var(--text-muted)' }}>Total Boarding Places</h3>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{places.length}</p>
+            </div>
+            <div className="card" style={{ borderLeft: '4px solid var(--danger)' }}>
+              <h3 style={{ color: 'var(--text-muted)' }}>Overdue Subscriptions</h3>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--danger)' }}>
+                {overduePlaces.length}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Property Owners</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalOwners}</p>
-          </div>
-        </div>
 
-        {/* Card 3 */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
-            <Building size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Boarding Places</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalPlaces}</p>
-          </div>
-        </div>
+          {/* Data Tables / Lists */}
+          <div className="grid-2">
+            {/* Left Column: All Places */}
+            <div className="card">
+              <div className="flex-between" style={{ marginBottom: '1rem' }}>
+                <h3>Registered Properties</h3>
+                <button onClick={() => navigate('/admin/add-property')} className="btn btn-primary" style={{ padding: '0.25rem 0.5rem' }}>+ Add</button>
+              </div>
+              
+              {places.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No properties registered yet.</p>
+              ) : (
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                  {places.map(place => (
+                    <li key={place._id} style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <strong>{place.name}</strong> 
+                      <span style={{ display: 'block', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                        Status: {place.subscriptionStatus}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-        {/* Card 4 */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
-            <Activity size={24} />
+            {/* Right Column: Recent Notification Logs */}
+            <div className="card">
+              <h3 style={{ marginBottom: '1rem' }}>Recent System Alerts (Logs)</h3>
+              {logs.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No recent notifications.</p>
+              ) : (
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                  {logs.slice(0, 5).map(log => (
+                    <li key={log._id} style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>[{log.channel}]</span> - {log.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Platform Admins</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalAdmins}</p>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Placeholder for future charts or tables */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Activity</h3>
-        <div className="flex flex-col items-center justify-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-          <Activity size={48} className="mb-4 text-gray-300" />
-          <p>No recent activity to display.</p>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

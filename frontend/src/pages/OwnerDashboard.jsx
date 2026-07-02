@@ -1,73 +1,90 @@
-import { useState, useEffect } from 'react';
-import api from '../utils/api';
-import { Building, PlusCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useState, useContext, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import axiosInstance from '../api/axiosInstance';
+import toast from 'react-hot-toast';
 
 const OwnerDashboard = () => {
-  const [myPlaces, setMyPlaces] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+  
+  // State for the properties this owner manages
+  const [places, setPlaces] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMyPlaces = async () => {
+    const fetchMyProperties = async () => {
       try {
-        const response = await api.get('/boarding-places/my-places');
-        setMyPlaces(response.data);
+        const response = await axiosInstance.get('/boarding-places/my-places');
+        setPlaces(response.data);
       } catch (error) {
-        console.error("Failed to fetch properties", error);
+        console.error("Failed to fetch properties:", error);
+        toast.error('Failed to load your properties.');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchMyPlaces();
+    fetchMyProperties();
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      
+      {/* Top Navigation / Header */}
+      <header className="flex-between" style={{ marginBottom: '2rem' }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Properties</h1>
-          <p className="text-gray-500 text-sm">Manage your boarding places and tenant requests.</p>
+          <h1 style={{ color: 'var(--primary)' }}>My Boarding Places</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Logged in as {user?.email}</p>
         </div>
-            <Link to="/owner/add-property" className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                <PlusCircle className="w-5 h-5 mr-2" />
-                Add Property
-            </Link>
-        </div>
+        <button onClick={logout} className="btn btn-outline">
+          Log Out
+        </button>
+      </header>
 
-      {myPlaces.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center flex flex-col items-center">
-          <Building className="h-16 w-16 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">No properties yet</h3>
-          <p className="mt-1 text-gray-500 max-w-sm">You haven't added any boarding places to your portfolio. Click the button above to get started.</p>
-        </div>
+      {/* Main Content Area */}
+      {loading ? (
+        <p>Loading your properties...</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {myPlaces.map((place) => (
-            <div key={place._id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center mb-4">
-                <div className="p-3 bg-blue-100 text-blue-600 rounded-lg mr-4">
-                  <Building size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{place.name}</h3>
-                  <p className="text-sm text-gray-500 truncate">{place.address}</p>
-                </div>
-              </div>
-              <div className="border-t border-gray-100 pt-4 mt-4">
-                <p className="text-sm font-medium text-gray-700">Capacity: {place.capacity || 0} tenants</p>
-              </div>
+        <>
+          <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+            <h2>Select a Property</h2>
+            <button 
+              onClick={() => navigate('/owner/add-property')} 
+              className="btn btn-primary"
+            >
+              + Add New Property
+            </button>
+          </div>
+
+          {places.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+              <h3 style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>You haven't set up any properties yet.</h3>
+              <p>Click the button above to register your first boarding place.</p>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="grid-2">
+              {places.map(place => (
+                <div 
+                  key={place._id} 
+                  className="card" 
+                  style={{ cursor: 'pointer', borderTop: `4px solid ${place.subscriptionStatus === 'ACTIVE' ? 'var(--success)' : 'var(--danger)'}` }}
+                  onClick={() => navigate(`/owner/property/${place._id}`)}
+                >
+                  <h3 style={{ marginBottom: '0.5rem' }}>{place.name}</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    {place.address}
+                  </p>
+                  
+                  <div className="flex-between" style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                    <span>Status: <span style={{ color: place.subscriptionStatus === 'ACTIVE' ? 'var(--success)' : 'var(--danger)' }}>{place.subscriptionStatus}</span></span>
+                    <span style={{ color: 'var(--primary)' }}>Manage &rarr;</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

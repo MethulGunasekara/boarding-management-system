@@ -12,6 +12,9 @@ const costRoutes = require('./routes/costRoutes');
 const tenantPortalRoutes = require('./routes/tenantPortalRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const depositRoutes = require('./routes/depositRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+
+const startRentCronJob = require('./cron/rentGenerator');
 
 // Error middleware
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
@@ -28,10 +31,11 @@ app.use('/admin', adminRoutes);
 app.use('/boarding-places', boardingPlaceRoutes);
 app.use('/tenants', tenantRoutes);
 app.use('/costs', costRoutes);
-app.use('/portal', tenantPortalRoutes);
+//app.use('/portal', tenantPortalRoutes);
 app.use('/upload', require('./routes/uploadRoutes'));
 app.use('/payments', paymentRoutes);
 app.use('/deposits', depositRoutes);
+app.use('/notifications', notificationRoutes); 
 
 // Error Handlers (must be last)
 app.use(notFound);
@@ -42,6 +46,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB successfully');
     const PORT = process.env.PORT || 5000;
+    startRentCronJob();
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
   })
   .catch((error) => {

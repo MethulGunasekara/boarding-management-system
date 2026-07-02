@@ -1,37 +1,22 @@
 const Cost = require('../models/Cost');
 const BoardingPlace = require('../models/BoardingPlace');
+const Tenant = require('../models/Tenant');           
+const ChargeLine = require('../models/ChargeLine');
 
-/**
- * @desc    Create a new shared cost rule
- * @route   POST /costs
- * @access  Private/Owner
- */
 const createCost = async (req, res) => {
   try {
     const { boardingPlaceId, title, splitType, amount, frequency } = req.body;
 
-    // 1. Security Check: Verify the owner actually owns this boarding place
-    const boardingPlace = await BoardingPlace.findOne({
-      _id: boardingPlaceId,
-      owner: req.user._id
-    });
+    const boardingPlace = await BoardingPlace.findOne({ _id: boardingPlaceId, owner: req.user._id });
+    if (!boardingPlace) return res.status(403).json({ message: 'Forbidden' });
 
-    if (!boardingPlace) {
-      return res.status(403).json({ message: 'Forbidden: You do not own this boarding place' });
+    // UPDATED VALIDATION
+    if (!['EVEN', 'CUSTOM', 'MANUAL'].includes(splitType)) {
+      return res.status(400).json({ message: 'Invalid split type.' });
     }
 
-    // 2. Validate splitType to ensure it strictly matches our Schema Enum
-    if (!['EVEN', 'CUSTOM'].includes(splitType)) {
-      return res.status(400).json({ message: 'Invalid split type. Must be EVEN or CUSTOM.' });
-    }
-
-    // 3. Create the cost rule
     const cost = await Cost.create({
-      boardingPlace: boardingPlaceId,
-      title,
-      splitType,
-      amount,
-      frequency: frequency || 'MONTHLY' // Default to monthly if not explicitly provided
+      boardingPlace: boardingPlaceId, title, splitType, amount, frequency: frequency || 'MONTHLY'
     });
 
     res.status(201).json(cost);
@@ -40,72 +25,84 @@ const createCost = async (req, res) => {
   }
 };
 
-const Tenant = require('../models/Tenant'); // We need the Tenant model for our math engine
-
-/**
- * @desc    View dynamically calculated cost allocations
- * @route   GET /costs/:id/allocations
- * @access  Private/Owner
- */
 const getCostAllocations = async (req, res) => {
   try {
     const costId = req.params.id;
-
-    // 1. Fetch the cost and populate the boarding place to verify ownership
     const cost = await Cost.findById(costId).populate('boardingPlace');
 
-    // Security check: Ensure the cost exists and the logged-in owner owns the parent boarding place
     if (!cost || cost.boardingPlace.owner.toString() !== req.user._id.toString()) {
-      return res.status(404).json({ message: 'Cost not found or unauthorized access' });
+      return res.status(404).json({ message: 'Cost not found or unauthorized' });
     }
 
-    // 2. Fetch all ACTIVE tenants in this specific boarding place
-    const activeTenants = await Tenant.find({
-      boardingPlace: cost.boardingPlace._id,
-      status: 'ACTIVE'
-    }).populate('room', 'roomNumber'); // Pull in the room number for a better frontend display
+    const activeTenants = await Tenant.find({ boardingPlace: cost.boardingPlace._id, status: 'ACTIVE' }).populate('room', 'roomNumber');
 
-    if (activeTenants.length === 0) {
-      return res.status(400).json({ message: 'No active tenants found to allocate this cost to' });
-    }
+    if (activeTenants.length === 0) return res.status(400).json({ message: 'No active tenants found.' });
 
     let allocations = [];
 
-    // 3. The Math Engine
     if (cost.splitType === 'EVEN') {
-      // JavaScript floating point math can be tricky, so we round to 2 decimal places
       const splitAmount = Number((cost.amount / activeTenants.length).toFixed(2));
-      
       allocations = activeTenants.map(tenant => ({
-        tenantId: tenant._id,
-        tenantName: tenant.fullName,
-        roomNumber: tenant.room.roomNumber,
-        allocatedAmount: splitAmount
+        tenantId: tenant._id, tenantName: tenant.fullName, roomNumber: tenant.room?.roomNumber || 'N/A', allocatedAmount: splitAmount
       }));
     } else {
-      // For CUSTOM splits, we send back a null amount so the frontend knows 
-      // to render input fields for the owner to manually type in the custom amounts.
+      // For BOTH Custom (Percentages) and Manual (Exact amounts), we send null. The frontend UI will do the heavy lifting!
       allocations = activeTenants.map(tenant => ({
-        tenantId: tenant._id,
-        tenantName: tenant.fullName,
-        roomNumber: tenant.room.roomNumber,
-        allocatedAmount: null, 
-        requiresManualInput: true
+        tenantId: tenant._id, tenantName: tenant.fullName, roomNumber: tenant.room?.roomNumber || 'N/A', allocatedAmount: null,
       }));
     }
 
-    // 4. Send back a clean, aggregated object for the frontend to render
     res.json({
-      costTitle: cost.title,
-      totalAmount: cost.amount,
-      splitType: cost.splitType,
-      activeTenantCount: activeTenants.length,
-      allocations
+      costTitle: cost.title, totalAmount: cost.amount, splitType: cost.splitType, activeTenantCount: activeTenants.length, allocations
     });
-
   } catch (error) {
     res.status(500).json({ message: 'Failed to calculate allocations', error: error.message });
   }
 };
+/**
+ * @desc    Confirm math and generate actual ChargeLine bills for a cost
+ * @route   POST /costs/:id/charges
+ * @access  Private/Owner
+ */
+const generateCharges = async (req, res) => {
+  try {
+    const costId = req.params.id;
+    const { allocations } = req.body; // This is the array of { tenantId, amount } from your React frontend
 
-module.exports = { createCost, getCostAllocations };
+    // 1. Security Check
+    const cost = await Cost.findById(costId).populate('boardingPlace');
+    if (!cost || cost.boardingPlace.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Forbidden: You do not own this cost record.' });
+    }
+
+    // 2. Generate the bills based on the exact amounts the frontend calculated!
+    const chargePromises = allocations.map(alloc => {
+      // Create a bill due 7 days from now
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      return ChargeLine.create({
+        tenant: alloc.tenantId,
+        costReference: costId,
+        type: 'SHARED_COST', // e.g., Water, WiFi, Electricity
+        amountDue: alloc.amount,
+        dueDate: dueDate,
+        status: 'PENDING'
+      });
+    });
+
+    // Run them all at the same time
+    await Promise.all(chargePromises);
+
+    res.status(201).json({ message: 'Charges generated successfully' });
+  } catch (error) {
+    console.error("Charge Generation Error:", error);
+    res.status(500).json({ message: 'Failed to generate charges', error: error.message });
+  }
+};
+
+module.exports = {
+  createCost,
+  getCostAllocations,
+  generateCharges 
+};

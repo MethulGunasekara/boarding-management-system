@@ -1,15 +1,10 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
-import { Provider } from 'react-redux'
-import { store } from './features/store'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {/* The Provider wraps the app, injecting the global Redux state */}
-    <Provider store={store}>
-      <App />
-    </Provider>
-  </React.StrictMode>,
-)
+    <App />
+  </React.StrictMode>
+);

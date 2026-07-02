@@ -13,8 +13,8 @@ const costSchema = new mongoose.Schema({
   },
   splitType: {
     type: String,
-    enum: ['EVEN', 'CUSTOM'], // Determines if the cost is split equally or by specific percentages
-    required: [true, 'Split type is required']
+    enum: ['EVEN', 'CUSTOM', 'MANUAL'], 
+    required: true
   },
   amount: {
     type: Number,

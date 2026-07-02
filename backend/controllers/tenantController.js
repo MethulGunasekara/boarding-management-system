@@ -24,7 +24,8 @@ const admitTenant = async (req, res) => {
       emergencyContactNumber,
       idFrontImageUrl,
       idBackImageUrl,
-      signatureImageUrl
+      signatureImageUrl,
+      rentAmount
     } = req.body;
 
     // 1. Security Check: Verify the logged-in owner actually owns this boarding place
@@ -77,16 +78,20 @@ const admitTenant = async (req, res) => {
       idFrontImageUrl,
       idBackImageUrl,
       signatureImageUrl,
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      monthlyRent: Number(rentAmount)
     });
 
-    // 4. Generate the first rent charge (rolling 30-day cycle from admission date)
-    // Due date = admission date + 30 days
-    const dueDate = new Date(tenant.admissionDate);
-    dueDate.setDate(dueDate.getDate() + 30);
-
-    // Note: Rent amount is not stored on the Tenant — the Owner will record it as a charge
-    // This creates a placeholder charge the owner can fill in
+    // 4. Generate the FIRST month's rent immediately
+    // The Cron Job will handle all future months automatically.
+    await ChargeLine.create({
+      tenant: tenant._id,
+      costReference: null, // Null because it's a direct rent charge, not a shared utility cost
+      type: 'RENT',
+      amountDue: Number(rentAmount),
+      dueDate: new Date(), // Due immediately upon moving in
+      status: 'PENDING'
+    });
 
     res.status(201).json(tenant);
   } catch (error) {

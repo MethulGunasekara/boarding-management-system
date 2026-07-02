@@ -12,9 +12,10 @@ const recordPayment = async (req, res) => {
   try {
     const { tenantId, amountPaid, method, proofUrl, paidOn, chargeLineId } = req.body;
 
-    // 1. Security Check: Verify the tenant belongs to one of the owner's boarding places
+    // 1. Security Check
     const tenant = await Tenant.findById(tenantId).populate('boardingPlace');
     if (!tenant) {
+      // The 'return' keyword is crucial here! It stops the rest of the function from running.
       return res.status(404).json({ message: 'Tenant not found' });
     }
 
@@ -36,14 +37,28 @@ const recordPayment = async (req, res) => {
       paidOn: paidOn || new Date()
     });
 
-    // 3. If a specific charge line was provided, mark it as PAID
+    // 3. Handle specific bills and partial payments
     if (chargeLineId) {
-      await ChargeLine.findByIdAndUpdate(chargeLineId, { status: 'PAID' });
+      const charge = await ChargeLine.findById(chargeLineId);
+      
+      if (charge) {
+        if (amountPaid >= charge.amountDue) {
+          charge.status = 'PAID';
+          charge.amountDue = 0; // Balance cleared
+        } else {
+          charge.amountDue -= amountPaid; // Partial payment logic
+        }
+        await charge.save();
+      }
     }
 
-    res.status(201).json(payment);
+    // 4. Send the SINGLE final success response
+    return res.status(201).json(payment);
+
   } catch (error) {
-    res.status(500).json({ message: 'Failed to record payment', error: error.message });
+    console.error("Payment Controller Error:", error);
+    // Send the SINGLE error response if something breaks
+    return res.status(500).json({ message: 'Failed to record payment', error: error.message });
   }
 };
 

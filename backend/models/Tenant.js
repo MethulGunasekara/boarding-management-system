@@ -32,6 +32,10 @@ const tenantSchema = new mongoose.Schema({
   nicNumber: { type: String, required: true, unique: true },
   contactNumber: { type: String, required: true },
   courseOrWorkplace: { type: String, required: true },
+  monthlyRent: {
+    type: Number,
+    required: [true, 'Monthly rent amount is required for the automated billing engine']
+  },
   
   // Emergency Contact Sub-document structure for clean grouping
   emergencyContact: {
