@@ -49,12 +49,23 @@ const OwnerDashboard = () => {
         <>
           <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
             <h2>Select a Property</h2>
-            <button 
-              onClick={() => navigate('/owner/add-property')} 
-              className="btn btn-primary"
-            >
-              + Add New Property
-            </button>
+            
+            {/* NEW: Button Group for Actions */}
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                onClick={() => navigate('/owner/approvals')} 
+                className="btn btn-outline"
+                style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+              >
+                ✓ Review Payments
+              </button>
+              <button 
+                onClick={() => navigate('/owner/add-property')} 
+                className="btn btn-primary"
+              >
+                + Add New Property
+              </button>
+            </div>
           </div>
 
           {places.length === 0 ? (

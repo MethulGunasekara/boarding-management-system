@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
 
-const { loginAdmin, loginOwner, loginTenant, registerOwner, registerTenant } = require('../controllers/authController');
+const { loginAdmin, loginOwner, loginTenant, registerOwner } = require('../controllers/authController');
 
+// Admin & Owner Routes
 router.post('/login', loginAdmin);
 router.post('/owner/login', loginOwner);
-router.post('/tenant/login', loginTenant);
 router.post('/owner/register', registerOwner);
-router.post('/tenant/register', registerTenant);
+
+// Tenant Routes
+router.post('/tenant/login', loginTenant);
 
 module.exports = router;

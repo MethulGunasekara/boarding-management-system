@@ -1,56 +1,66 @@
-const Tenant = require('../models/Tenant');
 const ChargeLine = require('../models/ChargeLine');
 
 /**
- * @desc    Get logged-in tenant's profile and dashboard data
- * @route   GET /portal/dashboard
+ * @desc    Get logged-in tenant's charges and balance
+ * @route   GET /portal/my-charges
  * @access  Private/Tenant
  */
-const getTenantDashboard = async (req, res) => {
+const getMyCharges = async (req, res) => {
   try {
-    // 1. Fetch the tenant using the ID embedded in their JWT token
-    const tenant = await Tenant.findById(req.user._id)
-      .populate('boardingPlace', 'name address') // Pull in the boarding place name and address
-      .populate('room', 'roomNumber');           // Pull in the specific room number
+    // req.user._id comes from your JWT token authentication middleware!
+    const charges = await ChargeLine.find({ tenant: req.user._id })
+      .populate('costReference', 'title') // If it's a shared utility, get the title
+      .sort({ dueDate: -1 });
 
-    if (!tenant) {
-      return res.status(404).json({ message: 'Tenant profile not found' });
+    // Calculate total outstanding
+    const totalDue = charges
+      .filter(c => c.status === 'PENDING')
+      .reduce((sum, c) => sum + c.amountDue, 0);
+
+    res.json({ charges, totalDue });
+  } catch (error) {
+    console.error("Portal Error:", error);
+    res.status(500).json({ message: 'Failed to load your bills' });
+  }
+};
+/**
+ * @desc    Submit proof of payment for a specific bill
+ * @route   POST /portal/charges/:id/pay
+ * @access  Private/Tenant
+ */
+const submitPaymentProof = async (req, res) => {
+  try {
+    const chargeId = req.params.id;
+    const { proofUrl } = req.body;
+
+    if (!proofUrl) {
+      return res.status(400).json({ message: 'Payment proof image is required' });
     }
 
-    // 2. Return the data to populate the app's home screen
-    res.json(tenant);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to load dashboard', error: error.message });
-  }
-};
-
-/**
- * @desc    Get logged-in tenant's utility bills/charges
- * @route   GET /portal/bills
- * @access  Private/Tenant
- */
-const getTenantBills = async (req, res) => {
-  try {
-    // Fetch all charge lines assigned to this specific tenant
-    const bills = await ChargeLine.find({ tenant: req.user._id })
-      .populate('costReference', 'title splitType frequency') // Get the name of the bill
-      .sort({ createdAt: -1 }); // Sort by newest first
-
-    // Calculate a quick summary for the frontend
-    const totalPending = bills
-      .filter(bill => bill.status === 'PENDING')
-      .reduce((acc, curr) => acc + curr.amountDue, 0);
-
-    res.json({
-      totalPending,
-      bills
+    // 1. Find the charge and ensure it belongs to THIS logged-in tenant
+    const charge = await ChargeLine.findOne({
+      _id: chargeId,
+      tenant: req.user._id
     });
+
+    if (!charge) {
+      return res.status(404).json({ message: 'Bill not found or unauthorized' });
+    }
+
+    if (charge.status === 'PAID') {
+      return res.status(400).json({ message: 'This bill is already paid.' });
+    }
+
+    // 2. Update the bill with the image and change the status
+    charge.status = 'UNDER_REVIEW';
+    charge.proofOfPaymentUrl = proofUrl;
+    await charge.save();
+
+    res.json({ message: 'Payment submitted for review successfully', charge });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch bills', error: error.message });
+    console.error("Payment Submission Error:", error);
+    res.status(500).json({ message: 'Failed to submit payment' });
   }
 };
 
-module.exports = { getTenantDashboard, getTenantBills };
-
-//tenantController.js is for Owners managing tenants. 
-//tenantPortalController.js is strictly for Tenants managing themselves.
+module.exports = { getMyCharges, submitPaymentProof };

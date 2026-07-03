@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 // Components & Pages
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
+
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAddProperty from './pages/AdminAddProperty';
 
@@ -15,6 +16,10 @@ import TenantList from './pages/TenantList';
 import OwnerAdmitTenant from './pages/OwnerAdmitTenant';
 import TenantProfile from './pages/TenantProfile';
 import CostDashboard from './pages/CostDashboard';
+import TenantDashboard from './pages/TenantDashboard';
+import PaymentApprovals from './pages/PaymentApprovals';
+
+import TenantLogin from './pages/TenantLogin';
 
 function App() {
   return (
@@ -90,6 +95,24 @@ function App() {
           />
           <Route path="/owner/tenant/:id" element={<TenantProfile />} />
           <Route path="/owner/property/:id/costs" element={<CostDashboard />} />
+          <Route path="/owner/approvals" 
+            element={
+              <ProtectedRoute allowedRoles={['OWNER']}>
+                <PaymentApprovals />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Tenant Login Route */}
+          <Route path="/tenant/login" element={<TenantLogin />} />
+          <Route 
+            path="/tenant/dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['TENANT']}>
+                <TenantDashboard />
+              </ProtectedRoute>
+            }
+          />  
         </Routes>
       </Router>
     </AuthProvider>

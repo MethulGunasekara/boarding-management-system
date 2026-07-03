@@ -14,6 +14,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const depositRoutes = require('./routes/depositRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
+
 const startRentCronJob = require('./cron/rentGenerator');
 
 // Error middleware
@@ -31,11 +32,11 @@ app.use('/admin', adminRoutes);
 app.use('/boarding-places', boardingPlaceRoutes);
 app.use('/tenants', tenantRoutes);
 app.use('/costs', costRoutes);
-//app.use('/portal', tenantPortalRoutes);
 app.use('/upload', require('./routes/uploadRoutes'));
 app.use('/payments', paymentRoutes);
 app.use('/deposits', depositRoutes);
 app.use('/notifications', notificationRoutes); 
+app.use('/portal', require('./routes/tenantPortalRoutes'));
 
 // Error Handlers (must be last)
 app.use(notFound);

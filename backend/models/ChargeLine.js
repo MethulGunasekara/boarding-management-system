@@ -27,9 +27,13 @@ const chargeLineSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['PENDING', 'PAID', 'OVERDUE', 'VOID'], // The lifecycle of a debt
+    enum: ['PENDING', 'PAID', 'OVERDUE', 'VOID','UNDER_REVIEW'], // The lifecycle of a debt
     default: 'PENDING',
     required: true
+  },
+  proofOfPaymentUrl: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true
