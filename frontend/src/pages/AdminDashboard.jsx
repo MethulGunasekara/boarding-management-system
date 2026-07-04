@@ -1,119 +1,123 @@
 import { useState, useContext, useEffect } from 'react';
-import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { useLang } from '../context/LangContext';
 import axiosInstance from '../api/axiosInstance';
 import toast from 'react-hot-toast';
+import { Building2, AlertTriangle, Bell, Plus } from 'lucide-react';
 
 const AdminDashboard = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
+  const { t }    = useLang();
   const navigate = useNavigate();
-  
-  // State containers for our three API endpoints
-  const [places, setPlaces] = useState([]);
+
+  const [places,        setPlaces]        = useState([]);
   const [overduePlaces, setOverduePlaces] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [logs,          setLogs]          = useState([]);
+  const [loading,       setLoading]       = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    (async () => {
       try {
-        // Fire all 3 requests at the same time
-        const [placesRes, overdueRes, logsRes] = await Promise.all([
+        const [p, o, l] = await Promise.all([
           axiosInstance.get('/admin/boarding-places'),
           axiosInstance.get('/admin/overdue'),
-          axiosInstance.get('/notifications/log')
+          axiosInstance.get('/notifications/log'),
         ]);
-        
-        // Update our state with the returned Express data
-        setPlaces(placesRes.data);
-        setOverduePlaces(overdueRes.data);
-        setLogs(logsRes.data);
-      } catch (error) {
-        console.error("Dashboard fetch error:", error);
-        toast.error('Failed to load dashboard data. Check your connection.');
+        setPlaces(p.data);
+        setOverduePlaces(o.data);
+        setLogs(l.data);
+      } catch {
+        toast.error('Failed to load dashboard data.');
       } finally {
-        setLoading(false); // Stop the loading spinner regardless of success/fail
+        setLoading(false);
       }
-    };
-
-    fetchDashboardData();
+    })();
   }, []);
 
+  if (loading) return <p style={{ color: 'var(--text-muted)' }}>{t('loading')}</p>;
+
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-      
-      {/* Top Navigation / Header */}
-      <header className="flex-between" style={{ marginBottom: '2rem' }}>
+    <div>
+      <div className="page-header flex-between">
         <div>
-          <h1 style={{ color: 'var(--primary)' }}>Admin Control Center</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user?.email}</p>
+          <h1 className="page-title">Admin Control Center</h1>
+          <p className="page-sub">Welcome back, {user?.email}</p>
         </div>
-        <button onClick={logout} className="btn btn-outline">
-          Log Out
+        <button className="btn btn-primary" onClick={() => navigate('/admin/add-property')}>
+          <Plus size={16} /> {t('addProperty')}
         </button>
-      </header>
+      </div>
 
-      {loading ? (
-        <p>Loading dashboard data...</p>
-      ) : (
-        <>
-          {/* Top-level Stat Cards */}
-          <div className="grid-2" style={{ marginBottom: '2rem' }}>
-            <div className="card">
-              <h3 style={{ color: 'var(--text-muted)' }}>Total Boarding Places</h3>
-              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{places.length}</p>
-            </div>
-            <div className="card" style={{ borderLeft: '4px solid var(--danger)' }}>
-              <h3 style={{ color: 'var(--text-muted)' }}>Overdue Subscriptions</h3>
-              <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--danger)' }}>
-                {overduePlaces.length}
-              </p>
-            </div>
+      {/* Stats */}
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-primary"><Building2 size={20} /></div>
+          <div>
+            <div className="stat-value">{places.length}</div>
+            <div className="stat-label">{t('totalProperties')}</div>
           </div>
-
-          {/* Data Tables / Lists */}
-          <div className="grid-2">
-            {/* Left Column: All Places */}
-            <div className="card">
-              <div className="flex-between" style={{ marginBottom: '1rem' }}>
-                <h3>Registered Properties</h3>
-                <button onClick={() => navigate('/admin/add-property')} className="btn btn-primary" style={{ padding: '0.25rem 0.5rem' }}>+ Add</button>
-              </div>
-              
-              {places.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)' }}>No properties registered yet.</p>
-              ) : (
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  {places.map(place => (
-                    <li key={place._id} style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)' }}>
-                      <strong>{place.name}</strong> 
-                      <span style={{ display: 'block', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                        Status: {place.subscriptionStatus}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Right Column: Recent Notification Logs */}
-            <div className="card">
-              <h3 style={{ marginBottom: '1rem' }}>Recent System Alerts (Logs)</h3>
-              {logs.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)' }}>No recent notifications.</p>
-              ) : (
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  {logs.slice(0, 5).map(log => (
-                    <li key={log._id} style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
-                      <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>[{log.channel}]</span> - {log.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-danger"><AlertTriangle size={20} /></div>
+          <div>
+            <div className="stat-value" style={{ color: 'var(--danger)' }}>{overduePlaces.length}</div>
+            <div className="stat-label">{t('overdueSubscriptions')}</div>
           </div>
-        </>
+        </div>
+      </div>
+
+      {/* Overdue alert */}
+      {overduePlaces.length > 0 && (
+        <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          <AlertTriangle size={16} color="var(--danger)" />
+          <strong>{overduePlaces.length} boarding place(s)</strong> have overdue subscriptions.
+        </div>
       )}
+
+      <div className="grid-2">
+        {/* Registered Properties */}
+        <div className="card">
+          <div className="flex-between" style={{ marginBottom: '1rem' }}>
+            <h3 className="section-title" style={{ margin: 0 }}>{t('registeredProperties')}</h3>
+          </div>
+          {places.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{t('noProperties')}</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {places.map(place => (
+                <div key={place._id} style={{ padding: '0.75rem', borderRadius: '0.5rem', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{place.name}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{place.address}</p>
+                  </div>
+                  <span className={`badge ${
+                    place.subscriptionStatus === 'ACTIVE'  ? 'badge-success' :
+                    place.subscriptionStatus === 'OVERDUE' ? 'badge-danger'  : 'badge-muted'
+                  }`}>{place.subscriptionStatus}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Notification logs */}
+        <div className="card">
+          <h3 className="section-title">Recent System Logs</h3>
+          {logs.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No recent notifications.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {logs.slice(0, 6).map(log => (
+                <div key={log._id} style={{ padding: '0.65rem 0.85rem', borderRadius: '0.5rem', background: 'var(--bg-surface)', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>[{log.channel}]</span>
+                  {' '}{log.message}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

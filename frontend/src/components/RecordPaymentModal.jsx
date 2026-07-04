@@ -1,96 +1,82 @@
 import { useState } from 'react';
+import { useLang } from '../context/LangContext';
 import axiosInstance from '../api/axiosInstance';
 import toast from 'react-hot-toast';
+import { X } from 'lucide-react';
 
 const RecordPaymentModal = ({ isOpen, onClose, tenantId, chargeLineId, onSuccess }) => {
-  const [amountPaid, setAmountPaid] = useState('');
-  const [method, setMethod] = useState('CASH');
+  const [amountPaid,   setAmountPaid]   = useState('');
+  const [method,       setMethod]       = useState('CASH');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t } = useLang();
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
-      const payload = {
+      await axiosInstance.post('/payments', {
         tenantId,
         amountPaid: Number(amountPaid),
         method,
-        // If they clicked a specific charge, link it so the backend marks it PAID
-        ...(chargeLineId && { chargeLineId }) 
-      };
-
-      await axiosInstance.post('/payments', payload);
-      
+        ...(chargeLineId && { chargeLineId }),
+      });
       toast.success('Payment recorded successfully!');
-      setAmountPaid(''); // Reset form
-      onSuccess();       // Tell the parent component to refresh the data
-      onClose();         // Close the modal
-    } catch (error) {
-      console.error("Payment error:", error);
-      toast.error(error.response?.data?.message || 'Failed to record payment');
+      setAmountPaid('');
+      onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to record payment');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Modal overlay styling
-  const overlayStyle = {
-    position: 'fixed',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000
-  };
-
-  const modalStyle = {
-    backgroundColor: 'white',
-    padding: '2rem',
-    borderRadius: '8px',
-    width: '100%',
-    maxWidth: '400px'
-  };
-
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Record Payment</h3>
-        
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+      <div className="card" style={{ width: '100%', maxWidth: 420, padding: '1.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h3 style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary)' }}>{t('recordPayment')}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+            <X size={20} />
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
+          <div className="form-group">
             <label className="form-label">Amount Paid (Rs.)</label>
-            <input 
-              type="number" 
-              className="form-input" 
-              value={amountPaid} 
-              onChange={(e) => setAmountPaid(e.target.value)} 
-              min="1" 
-              required 
-            />
+            <input type="number" className="form-input"
+              value={amountPaid} onChange={e => setAmountPaid(e.target.value)} min="1" required />
           </div>
 
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">Payment Method</label>
-            <select 
-              className="form-input" 
-              value={method} 
-              onChange={(e) => setMethod(e.target.value)}
-            >
-              <option value="CASH">Cash</option>
-              <option value="BANK_TRANSFER">Bank Transfer</option>
-            </select>
+          <div className="form-group" style={{ marginBottom: '1.75rem' }}>
+            <label className="form-label">{t('paymentMethod')}</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.4rem' }}>
+              {[
+                { val: 'CASH',          label: t('cash') },
+                { val: 'BANK_TRANSFER', label: t('bankTransfer') },
+              ].map(m => (
+                <label key={m.val} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.65rem 0.85rem', border: `2px solid ${method === m.val ? 'var(--primary)' : 'var(--border-color)'}`,
+                  borderRadius: '0.6rem', cursor: 'pointer', background: method === m.val ? 'rgba(114,76,249,0.06)' : 'transparent',
+                  transition: 'all 0.2s', fontSize: '0.875rem', fontWeight: 500,
+                }}>
+                  <input type="radio" name="method" value={m.val} checked={method === m.val}
+                    onChange={() => setMethod(m.val)} style={{ accentColor: 'var(--primary)' }} />
+                  {m.label}
+                </label>
+              ))}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-            <button type="button" onClick={onClose} className="btn btn-outline" disabled={isSubmitting}>
-              Cancel
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button type="button" onClick={onClose} className="btn btn-outline" style={{ flex: 1 }} disabled={isSubmitting}>
+              {t('cancel')}
             </button>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Record Payment'}
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
+              {isSubmitting ? t('loading') : t('save')}
             </button>
           </div>
         </form>

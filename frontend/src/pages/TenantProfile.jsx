@@ -1,196 +1,208 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLang } from '../context/LangContext';
 import axiosInstance from '../api/axiosInstance';
 import toast from 'react-hot-toast';
 import RecordPaymentModal from '../components/RecordPaymentModal';
+import { ArrowLeft, CreditCard, AlertTriangle } from 'lucide-react';
 
 const TenantProfile = () => {
-  const { id } = useParams();
+  const { id }   = useParams();
   const navigate = useNavigate();
-  
-  const [tenant, setTenant] = useState(null);
+  const { t }    = useLang();
+
+  const [tenant,  setTenant]  = useState(null);
   const [charges, setCharges] = useState({ charges: [], totalDue: 0 });
   const [loading, setLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedChargeId, setSelectedChargeId] = useState(null);
+  const [selectedChargeId,   setSelectedChargeId]   = useState(null);
 
-  // 1. Define the fetch function OUTSIDE the useEffect so the Modal can use it
   const fetchTenantData = async () => {
     try {
       const [tenantRes, chargesRes] = await Promise.all([
         axiosInstance.get(`/tenants/${id}`),
-        axiosInstance.get(`/tenants/${id}/charges`)
+        axiosInstance.get(`/tenants/${id}/charges`),
       ]);
-      
       setTenant(tenantRes.data);
-      setCharges(chargesRes.data); 
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching tenant data:", error);
-      toast.error("Failed to load tenant details.");
+      setCharges(chargesRes.data);
+    } catch {
+      toast.error('Failed to load tenant details.');
+    } finally {
       setLoading(false);
     }
   };
 
-  // 2. Call it inside a SINGLE useEffect when the component loads
-  useEffect(() => {
-    fetchTenantData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  useEffect(() => { fetchTenantData(); }, [id]);
 
   const handleMoveOut = async () => {
-    const confirm = window.confirm(
-      "Are you sure you want to mark this tenant as moved out? This will void all pending charges."
-    );
-    
-    if (!confirm) return;
-
+    if (!window.confirm('Are you sure? This will void all pending charges.')) return;
     try {
       await axiosInstance.patch(`/tenants/${id}/move-out`);
-      toast.success("Tenant successfully moved out.");
-      setTenant(prevTenant => ({ ...prevTenant, status: 'MOVED_OUT' }));
-    } catch (error) {
-      console.error("Move out error:", error);
-      toast.error(error.response?.data?.message || "Failed to process move out.");
+      toast.success('Tenant successfully moved out.');
+      setTenant(prev => ({ ...prev, status: 'MOVED_OUT' }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to process move out.');
     }
   };
 
+  if (loading) return <p style={{ color: 'var(--text-muted)' }}>{t('loading')}</p>;
+  if (!tenant) return <p>Tenant not found.</p>;
+
   return (
-    <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
-      <button onClick={() => navigate(-1)} className="btn btn-outline" style={{ marginBottom: '1.5rem' }}>
-        &larr; Back
+    <div>
+      <button onClick={() => navigate(-1)} className="btn btn-outline btn-sm" style={{ marginBottom: '1.25rem' }}>
+        <ArrowLeft size={14} /> {t('back')}
       </button>
 
-      {loading ? (
-        <div>Loading profile...</div>
-      ) : (
-        <div className="profile-grid">
-          {/* Section 1: Tenant Details */}
-          <div className="card">
-            <h2 style={{ marginBottom: '0.5rem', color: 'var(--primary)' }}>{tenant.fullName}</h2>
-            
-            <div style={{ display: 'inline-block', padding: '0.25rem 0.5rem', backgroundColor: tenant.status === 'ACTIVE' ? '#d1e7dd' : '#e2e3e5', color: tenant.status === 'ACTIVE' ? '#0f5132' : '#41464b', borderRadius: '4px', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 'bold' }}>
-              {tenant.status}
+      <div className="profile-grid">
+        {/* Profile card */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg,#ca7df9,#724cf9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '1.4rem', flexShrink: 0 }}>
+              {tenant.fullName.charAt(0).toUpperCase()}
             </div>
-
-            <div className="grid-2">
-              <div>
-                <h4 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Personal Info</h4>
-                <p style={{ marginBottom: '0.5rem' }}><strong>NIC:</strong> {tenant.nicNumber}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Email:</strong> {tenant.email}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Contact:</strong> {tenant.contactNumber}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Address:</strong> {tenant.address}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Course/Work:</strong> {tenant.courseOrWorkplace}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Rent:</strong> Rs. {tenant.monthlyRent}</p>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{tenant.fullName}</h2>
+                <span className={`badge ${tenant.status === 'ACTIVE' ? 'badge-success' : 'badge-muted'}`}>{tenant.status}</span>
+                {charges.totalDue > 0 && (
+                  <span className="badge badge-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <AlertTriangle size={11} /> Overdue
+                  </span>
+                )}
               </div>
-              <div>
-                <h4 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Tenancy Details</h4>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Room:</strong> Room {tenant.room?.roomNumber}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Admitted:</strong> {new Date(tenant.admissionDate).toLocaleDateString()}</p>
-                
-                <h4 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem', marginTop: '1.5rem' }}>Emergency Contact</h4>
-                <p style={{ marginBottom: '0.25rem' }}><strong>Name:</strong> {tenant.emergencyContact?.name}</p>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Number:</strong> {tenant.emergencyContact?.number}</p>
-              </div>
+              {charges.totalDue > 0 && (
+                <p style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--danger)' }}>
+                  Rs. {charges.totalDue} outstanding
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Section 2: Financials  */}
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3>Financial Summary</h3>
-              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-light)' }}>Total Outstanding</p>
-                  <h3 style={{ margin: 0, color: 'var(--danger)' }}>Rs. {charges.totalDue}</h3>
-                </div>
-              </div>
+          <div className="grid-2">
+            <div>
+              <h4 style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+                Personal Info
+              </h4>
+              {[
+                ['NIC',      tenant.nicNumber],
+                ['Email',    tenant.email],
+                ['Contact',  tenant.contactNumber],
+                ['Address',  tenant.address],
+                ['Course',   tenant.courseOrWorkplace],
+                ['Rent',     `Rs. ${tenant.monthlyRent}`],
+              ].map(([label, val]) => (
+                <p key={label} style={{ fontSize: '0.875rem', marginBottom: '0.4rem' }}>
+                  <strong style={{ color: 'var(--text-muted)', marginRight: '0.3rem' }}>{label}:</strong>{val}
+                </p>
+              ))}
             </div>
+            <div>
+              <h4 style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+                Tenancy
+              </h4>
+              <p style={{ fontSize: '0.875rem', marginBottom: '0.4rem' }}><strong style={{ color: 'var(--text-muted)' }}>Room:</strong> Room {tenant.room?.roomNumber}</p>
+              <p style={{ fontSize: '0.875rem', marginBottom: '1rem' }}><strong style={{ color: 'var(--text-muted)' }}>Admitted:</strong> {new Date(tenant.admissionDate).toLocaleDateString()}</p>
 
-            <h4 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              Charge History
-            </h4>
-            
-            {charges.charges.length === 0 ? (
-              <p>No charges recorded yet.</p>
-            ) : (
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ paddingBottom: '0.5rem' }}>Date Due</th>
-                    <th style={{ paddingBottom: '0.5rem' }}>Status</th>
-                    <th style={{ paddingBottom: '0.5rem' }}>Amount</th>
-                    <th style={{ paddingBottom: '0.5rem' }}>Action</th> {/* NEW HEADER */}
-                  </tr>
-                </thead>
-                <tbody>
-                  {charges.charges.map((charge) => (
-                    <tr key={charge._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '0.75rem 0' }}>{new Date(charge.dueDate).toLocaleDateString()}</td>
-                      <td style={{ padding: '0.75rem 0' }}>
-                        <span style={{ 
-                          padding: '0.25rem 0.5rem', 
-                          borderRadius: '4px', 
-                          fontSize: '0.85rem',
-                          backgroundColor: charge.status === 'PENDING' ? '#fff3cd' : '#d1e7dd',
-                          color: charge.status === 'PENDING' ? '#856404' : '#0f5132'
-                        }}>
-                          {charge.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.75rem 0' }}>Rs. {charge.amountDue}</td>
-                      
-                      {/* NEW ACTION COLUMN */}
-                      <td style={{ padding: '0.75rem 0' }}>
-                        {charge.status === 'PENDING' && (
-                          <button 
-                            onClick={() => {
-                              setSelectedChargeId(charge._id);
-                              setIsPaymentModalOpen(true);
-                            }}
-                            className="btn btn-outline"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-                          >
-                            Pay This
-                          </button>
-                        )}
-                      </td>
-
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Section 3: Documents */}
-          <div className="card">
-            <h3>Documents</h3>
-            <div className="doc-grid">
-              <img src={tenant.idFrontImageUrl} alt="ID Front" style={{ width: '100%' }} />
-              <img src={tenant.idBackImageUrl} alt="ID Back" style={{ width: '100%' }} />
-              <img src={tenant.signatureImageUrl} alt="Signature" style={{ width: '100%' }} />
+              <h4 style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+                Emergency Contact
+              </h4>
+              <p style={{ fontSize: '0.875rem', marginBottom: '0.4rem' }}><strong style={{ color: 'var(--text-muted)' }}>Name:</strong> {tenant.emergencyContact?.name}</p>
+              <p style={{ fontSize: '0.875rem' }}><strong style={{ color: 'var(--text-muted)' }}>Number:</strong> {tenant.emergencyContact?.number}</p>
             </div>
-          </div>
-
-          {/* Section 4: Actions */}
-          <div className="card">
-            <h3>Actions</h3>
-            <button onClick={handleMoveOut} className="btn btn-danger">Move Out Tenant</button>
           </div>
         </div>
-      )} 
-      
-      {/* 3. The comma was removed here, and the Modal is safely inside the main return div */}
-      <RecordPaymentModal 
+
+        {/* Charges & payment */}
+        <div className="card">
+          <div className="flex-between" style={{ marginBottom: '1.25rem' }}>
+            <h3 className="section-title" style={{ margin: 0 }}>Financial Summary</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Outstanding</p>
+                <p style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--danger)' }}>Rs. {charges.totalDue}</p>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => { setSelectedChargeId(null); setIsPaymentModalOpen(true); }}>
+                <CreditCard size={14} /> {t('recordPayment')}
+              </button>
+            </div>
+          </div>
+
+          <h4 style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Charge History
+          </h4>
+
+          {charges.charges.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No charges recorded yet.</p>
+          ) : (
+            <table className="bms-table">
+              <thead>
+                <tr>
+                  <th>Date Due</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                  <th>Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charges.charges.map(charge => (
+                  <tr key={charge._id}>
+                    <td>{new Date(charge.dueDate).toLocaleDateString()}</td>
+                    <td>{charge.type === 'RENT' ? 'Monthly Rent' : charge.costReference?.title || 'Shared Bill'}</td>
+                    <td>
+                      <span className={`badge ${
+                        charge.status === 'PENDING'      ? 'badge-warning' :
+                        charge.status === 'PAID'         ? 'badge-success' :
+                        charge.status === 'UNDER_REVIEW' ? 'badge-info'    : 'badge-muted'
+                      }`}>{charge.status.replace('_', ' ')}</span>
+                    </td>
+                    <td style={{ fontWeight: 600 }}>Rs. {charge.amountDue}</td>
+                    <td>
+                      {charge.status === 'PENDING' && (
+                        <button className="btn btn-outline btn-sm" onClick={() => { setSelectedChargeId(charge._id); setIsPaymentModalOpen(true); }}>
+                          Pay This
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Documents */}
+        <div className="card">
+          <h3 className="section-title">Documents</h3>
+          <div className="doc-grid">
+            {[tenant.idFrontImageUrl, tenant.idBackImageUrl, tenant.signatureImageUrl]
+              .filter(Boolean)
+              .map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noreferrer">
+                  <img src={url} alt={['ID Front','ID Back','Signature'][i]} style={{ width: '100%' }} />
+                </a>
+              ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="card">
+          <h3 className="section-title">Actions</h3>
+          {tenant.status === 'ACTIVE' && (
+            <button onClick={handleMoveOut} className="btn btn-danger">
+              {t('moveOut')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <RecordPaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={() => {
-          setIsPaymentModalOpen(false);
-          setSelectedChargeId(null); // Reset it when closing
-        }}
+        onClose={() => { setIsPaymentModalOpen(false); setSelectedChargeId(null); }}
         tenantId={id}
-        chargeLineId={selectedChargeId} // Pass the specific ID to the modal!
-        onSuccess={fetchTenantData} 
+        chargeLineId={selectedChargeId}
+        onSuccess={fetchTenantData}
       />
     </div>
   );

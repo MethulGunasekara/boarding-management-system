@@ -1,124 +1,74 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLang } from '../context/LangContext';
 import axiosInstance from '../api/axiosInstance';
 import toast from 'react-hot-toast';
-
+import { ArrowLeft } from 'lucide-react';
 
 const AdminAddProperty = () => {
   const navigate = useNavigate();
-  
-  // State for the dropdown options
+  const { t }    = useLang();
   const [owners, setOwners] = useState([]);
-  
-  // State for the form payload
-  const [formData, setFormData] = useState({
-    ownerId: '',
-    name: '',
-    address: '',
-    subscriptionMonths: 1
-  });
+  const [formData, setFormData] = useState({ ownerId: '', name: '', address: '', subscriptionMonths: 1 });
 
-  // 1. Fetch owners when the page loads
   useEffect(() => {
-    const fetchOwners = async () => {
-      try {
-        const response = await axiosInstance.get('/admin/users');
-        // Filter the response so only Owners appear in the dropdown
-        const onlyOwners = response.data.filter(user => user.role === 'OWNER');
-        setOwners(onlyOwners);
-      } catch (error) {
-        toast.error('Failed to load owners list.');
-      }
-    };
-    fetchOwners();
+    axiosInstance.get('/admin/users')
+      .then(res => setOwners(res.data.filter(u => u.role === 'OWNER')))
+      .catch(() => toast.error('Failed to load owners list.'));
   }, []);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  // 2. Handle the form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await axiosInstance.post('/admin/boarding-places', formData);
       toast.success('Property registered and subscription activated!');
-      navigate('/admin/dashboard'); // Send them back to the control center
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to register property.');
+      navigate('/admin/dashboard');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to register property.');
     }
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-      <button 
-        onClick={() => navigate('/admin/dashboard')} 
-        className="btn btn-outline" 
-        style={{ marginBottom: '1.5rem' }}
-      >
-        &larr; Back to Dashboard
+    <div style={{ maxWidth: 600 }}>
+      <button onClick={() => navigate('/admin/dashboard')} className="btn btn-outline btn-sm" style={{ marginBottom: '1.25rem' }}>
+        <ArrowLeft size={14} /> {t('back')}
       </button>
 
+      <div className="page-header">
+        <h1 className="page-title">Register New Boarding Place</h1>
+        <p className="page-sub">Create a property and link it to an owner's account</p>
+      </div>
+
       <div className="card">
-        <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Register New Boarding Place</h2>
-        
-        {/* We will attach the onSubmit handler in the next step */}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Select Owner</label>
-            <select 
-              className="form-input" 
-              name="ownerId" 
-              value={formData.ownerId} 
-              onChange={handleChange}
-              required
-            >
+            <select className="form-input" value={formData.ownerId}
+              onChange={e => setFormData({ ...formData, ownerId: e.target.value })} required>
               <option value="" disabled>-- Choose an Owner --</option>
-              {owners.map(owner => (
-                <option key={owner._id} value={owner._id}>
-                  {owner.fullName} ({owner.email})
-                </option>
+              {owners.map(o => (
+                <option key={o._id} value={o._id}>{o.fullName} ({o.email})</option>
               ))}
             </select>
           </div>
 
           <div className="form-group">
             <label className="form-label">Property Name</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              name="name"
-              placeholder="e.g., Green Valley Boarding"
-              value={formData.name}
-              onChange={handleChange}
-              required 
-            />
+            <input type="text" className="form-input" placeholder="e.g., Green Valley Boarding"
+              value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
           </div>
 
           <div className="form-group">
             <label className="form-label">Property Address</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              name="address"
-              placeholder="Full street address"
-              value={formData.address}
-              onChange={handleChange}
-              required 
-            />
+            <input type="text" className="form-input" placeholder="Full street address"
+              value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} required />
           </div>
 
-          <div className="form-group" style={{ marginBottom: '2rem' }}>
+          <div className="form-group" style={{ marginBottom: '1.75rem' }}>
             <label className="form-label">Initial Subscription (Months)</label>
-            <input 
-              type="number" 
-              className="form-input" 
-              name="subscriptionMonths"
-              min="1"
+            <input type="number" className="form-input" min="1"
               value={formData.subscriptionMonths}
-              onChange={handleChange}
-              required 
-            />
+              onChange={e => setFormData({ ...formData, subscriptionMonths: e.target.value })} required />
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.75rem' }}>

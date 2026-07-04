@@ -1,202 +1,169 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLang } from '../context/LangContext';
 import axiosInstance from '../api/axiosInstance';
 import toast from 'react-hot-toast';
+import { ArrowLeft, Upload, CheckCircle } from 'lucide-react';
 
 const OwnerAdmitTenant = () => {
-  const { id } = useParams(); 
+  const { id }   = useParams();
   const navigate = useNavigate();
+  const { t }    = useLang();
 
   const [availableRooms, setAvailableRooms] = useState([]);
-
-  // 1. Expanded Form State to match Mongoose Schema
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    phoneNumber: '', 
-    address: '',
-    nicNumber: '',
-    courseOrWorkplace: '',
-    emergencyName: '',
-    emergencyNumber: '',
-    roomId: '',
-    rentAmount: ''
+    fullName: '', email: '', password: '', phoneNumber: '',
+    address: '', nicNumber: '', courseOrWorkplace: '',
+    emergencyName: '', emergencyNumber: '', roomId: '', rentAmount: '',
   });
-
-  // 2. State for all three required images
-  const [images, setImages] = useState({
-    idFront: null,
-    idBack: null,
-    signature: null
-  });
-
+  const [images,        setImages]        = useState({ idFront: null, idBack: null, signature: null });
   const [depositAmount, setDepositAmount] = useState('');
+  const [submitting,    setSubmitting]    = useState(false);
 
   useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const response = await axiosInstance.get(`/boarding-places/${id}/rooms`);
-        const roomsWithSpace = response.data.filter(room => room.availableSpots > 0);
-        setAvailableRooms(roomsWithSpace);
-      } catch (error) {
-        toast.error("Failed to load available rooms.");
-      }
-    };
-    fetchRooms();
+    axiosInstance.get(`/boarding-places/${id}/rooms`)
+      .then(res => setAvailableRooms(res.data.filter(r => r.availableSpots > 0)))
+      .catch(() => toast.error('Failed to load available rooms.'));
   }, [id]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange      = e => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleImageChange = e => setImages({ ...images, [e.target.name]: e.target.files[0] });
 
-  const handleImageChange = (e) => {
-    setImages({ ...images, [e.target.name]: e.target.files[0] });
-  };
-
-  // 3. The Upgraded Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    // Manual validation — avoids the hidden-input focus error
     if (!images.idFront || !images.idBack || !images.signature) {
-      return toast.error("Please upload all three required images.");
+      return toast.error('Please upload all three required images (ID Front, ID Back, Signature).');
     }
-
+    setSubmitting(true);
     try {
-      // Step 1: Upload all three images concurrently
-      const uploadPromises = [images.idFront, images.idBack, images.signature].map(img => {
-        const imagePayload = new FormData();
-        imagePayload.append('image', img);
-        return axiosInstance.post('/upload', imagePayload, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+      const uploadResults = await Promise.all(
+        [images.idFront, images.idBack, images.signature].map(img => {
+          const fd = new FormData();
+          fd.append('image', img);
+          return axiosInstance.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        })
+      );
+      const [frontUrl, backUrl, signatureUrl] = uploadResults.map(r => r.data.url);
+
+      const tenantRes = await axiosInstance.post('/tenants', {
+        fullName: formData.fullName, email: formData.email, password: formData.password,
+        contactNumber: formData.phoneNumber, address: formData.address, nicNumber: formData.nicNumber,
+        courseOrWorkplace: formData.courseOrWorkplace,
+        emergencyContactName: formData.emergencyName, emergencyContactNumber: formData.emergencyNumber,
+        idFrontImageUrl: frontUrl, idBackImageUrl: backUrl, signatureImageUrl: signatureUrl,
+        roomId: formData.roomId, rentAmount: formData.rentAmount, boardingPlaceId: id,
       });
 
-      // Wait for all 3 uploads to finish
-      const uploadResults = await Promise.all(uploadPromises);
-      
-      // Extract the URLs in the exact order we sent them
-      const [frontUrl, backUrl, signatureUrl] = uploadResults.map(res => res.data.url);
-
-      // Step 2: Create the Tenant (Perfectly mapped to Backend!)
-      const tenantPayload = {
-        fullName: formData.fullName,
-        email: formData.email,
-        password: formData.password,
-        contactNumber: formData.phoneNumber,
-        address: formData.address,
-        nicNumber: formData.nicNumber,
-        courseOrWorkplace: formData.courseOrWorkplace,
-        emergencyContactName: formData.emergencyName,
-        emergencyContactNumber: formData.emergencyNumber,
-        idFrontImageUrl: frontUrl,
-        idBackImageUrl: backUrl,
-        signatureImageUrl: signatureUrl,
-        roomId: formData.roomId,
-        rentAmount: formData.rentAmount,
-        boardingPlaceId: id
-      };
-
-      const tenantRes = await axiosInstance.post('/tenants', tenantPayload);
-      const newTenantId = tenantRes.data._id; 
-
-      // Step 3: Record the Deposit (Updated to include mandatory Schema fields)
-      const depositPayload = {
-        tenantId: newTenantId,
+      await axiosInstance.post('/deposits', {
+        tenantId: tenantRes.data._id,
         amount: Number(depositAmount),
-        minimumStayMonths: 6, // Mandatory for your backend schema
-        refundEligibleDate: new Date(new Date().setMonth(new Date().getMonth() + 6))
-      };
-
-      await axiosInstance.post('/deposits', depositPayload);
+        minimumStayMonths: 6,
+        refundEligibleDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
+      });
 
       toast.success('Tenant admitted and deposit recorded!');
       navigate(`/owner/property/${id}/tenants`);
-      
-    } catch (error) {
-      console.error("Admission error:", error);
-      toast.error(error.response?.data?.message || 'Transaction failed.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Transaction failed.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // File field — NO required attribute on the hidden input
+  const FileField = ({ name, label }) => (
+    <div className="form-group">
+      <label className="form-label">
+        {label}
+        {!images[name] && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>}
+      </label>
+      <label style={{
+        display: 'flex', alignItems: 'center', gap: '0.65rem',
+        border: `2px dashed ${images[name] ? 'var(--success)' : 'var(--border-color)'}`,
+        borderRadius: 'var(--radius)', padding: '0.75rem', cursor: 'pointer',
+        background: images[name] ? 'rgba(16,185,129,0.05)' : 'transparent',
+        transition: 'all 0.2s',
+      }}>
+        {/* No `required` here — validation is done manually in handleSubmit */}
+        <input
+          type="file"
+          name={name}
+          accept="image/*"
+          onChange={handleImageChange}
+          style={{ display: 'none' }}
+        />
+        {images[name]
+          ? <><CheckCircle size={17} color="var(--success)" /><span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>{images[name].name}</span></>
+          : <><Upload size={17} color="var(--text-muted)" /><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Click to upload</span></>
+        }
+      </label>
+    </div>
+  );
+
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <button onClick={() => navigate(`/owner/property/${id}/tenants`)} className="btn btn-outline" style={{ marginBottom: '1.5rem' }}>
-        &larr; Back to Tenants List
+    <div style={{ maxWidth: 800 }}>
+      <button onClick={() => navigate(`/owner/property/${id}/tenants`)} className="btn btn-outline btn-sm" style={{ marginBottom: '1.25rem' }}>
+        <ArrowLeft size={14} /> Back to Tenants
       </button>
+      <div className="page-header">
+        <h1 className="page-title">{t('admitTenant')}</h1>
+      </div>
 
-      <div className="card">
-        <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Admit New Tenant</h2>
-        
-        <form onSubmit={handleSubmit}>
-          
-          {/* Section 1: Personal Information */}
-          <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>1. Personal Information</h3>
-          
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="section-title">1. Personal Information</h3>
           <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input type="text" className="form-input" name="fullName" value={formData.fullName} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">NIC Number</label>
-              <input type="text" className="form-input" name="nicNumber" value={formData.nicNumber} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input type="email" className="form-input" name="email" value={formData.email} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Temporary Password</label>
-              <input type="text" className="form-input" name="password" value={formData.password} onChange={handleChange} placeholder="For tenant portal login" required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Phone Number</label>
-              <input type="tel" className="form-input" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Course / Workplace</label>
-              <input type="text" className="form-input" name="courseOrWorkplace" value={formData.courseOrWorkplace} onChange={handleChange} required />
-            </div>
+            {[
+              { name: 'fullName',          label: 'Full Name',           type: 'text'  },
+              { name: 'nicNumber',         label: 'NIC Number',          type: 'text'  },
+              { name: 'email',             label: 'Email',               type: 'email' },
+              { name: 'password',          label: 'Temporary Password',  type: 'text'  },
+              { name: 'phoneNumber',       label: 'Phone Number',        type: 'tel'   },
+              { name: 'courseOrWorkplace', label: 'Course / Workplace',  type: 'text'  },
+            ].map(f => (
+              <div key={f.name} className="form-group">
+                <label className="form-label">{f.label}</label>
+                <input type={f.type} className="form-input" name={f.name}
+                  value={formData[f.name]} onChange={handleChange} required />
+              </div>
+            ))}
           </div>
-
           <div className="form-group">
             <label className="form-label">Permanent Address</label>
-            <input type="text" className="form-input" name="address" value={formData.address} onChange={handleChange} required />
+            <input type="text" className="form-input" name="address"
+              value={formData.address} onChange={handleChange} required />
           </div>
+        </div>
 
-          {/* Section 2: Emergency Contact */}
-          <h3 style={{ marginBottom: '1rem', marginTop: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>2. Emergency Contact</h3>
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="section-title">2. Emergency Contact</h3>
           <div className="grid-2">
-             <div className="form-group">
+            <div className="form-group">
               <label className="form-label">Contact Name</label>
-              <input type="text" className="form-input" name="emergencyName" value={formData.emergencyName} onChange={handleChange} required />
+              <input type="text" className="form-input" name="emergencyName"
+                value={formData.emergencyName} onChange={handleChange} required />
             </div>
             <div className="form-group">
               <label className="form-label">Contact Number</label>
-              <input type="tel" className="form-input" name="emergencyNumber" value={formData.emergencyNumber} onChange={handleChange} required />
+              <input type="tel" className="form-input" name="emergencyNumber"
+                value={formData.emergencyNumber} onChange={handleChange} required />
             </div>
           </div>
+        </div>
 
-          {/* Section 3: Document Uploads */}
-          <h3 style={{ marginBottom: '1rem', marginTop: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>3. Required Documents</h3>
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="section-title">3. Required Documents</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>All three documents are required before submission.</p>
           <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">ID Front Image</label>
-              <input type="file" className="form-input" name="idFront" accept="image/*" onChange={handleImageChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">ID Back Image</label>
-              <input type="file" className="form-input" name="idBack" accept="image/*" onChange={handleImageChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Signature Image</label>
-              <input type="file" className="form-input" name="signature" accept="image/*" onChange={handleImageChange} required />
-            </div>
+            <FileField name="idFront"   label="ID Front Image" />
+            <FileField name="idBack"    label="ID Back Image" />
+            <FileField name="signature" label="Signature Image" />
           </div>
+        </div>
 
-          {/* Section 4: Room Assignment & Deposit */}
-          <h3 style={{ marginBottom: '1rem', marginTop: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>4. Room & Financials</h3>
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <h3 className="section-title">4. Room & Financials</h3>
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Assign Room</label>
@@ -210,21 +177,24 @@ const OwnerAdmitTenant = () => {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Monthly Rent Amount</label>
-              <input type="number" className="form-input" name="rentAmount" min="0" value={formData.rentAmount} onChange={handleChange} required />
+              <label className="form-label">Monthly Rent Amount (Rs.)</label>
+              <input type="number" className="form-input" name="rentAmount" min="0"
+                value={formData.rentAmount} onChange={handleChange} required />
             </div>
           </div>
-
           <div className="form-group">
-            <label className="form-label">Deposit Amount Paid (Key Money)</label>
-            <input type="number" className="form-input" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} min="0" required />
+            <label className="form-label">Deposit Amount Paid / Key Money (Rs.)</label>
+            <input type="number" className="form-input" min="0"
+              value={depositAmount} onChange={e => setDepositAmount(e.target.value)} required />
           </div>
+        </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', marginTop: '1.5rem', fontSize: '1.1rem' }}>
-            Admit Tenant & Record Deposit
-          </button>
-        </form>
-      </div>
+        <button type="submit" className="btn btn-primary"
+          style={{ width: '100%', padding: '0.85rem', fontSize: '1rem' }}
+          disabled={submitting}>
+          {submitting ? 'Uploading & Saving...' : 'Admit Tenant & Record Deposit'}
+        </button>
+      </form>
     </div>
   );
 };
