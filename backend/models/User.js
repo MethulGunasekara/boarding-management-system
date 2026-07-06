@@ -1,55 +1,33 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); // Bring in our hashing library
+const bcrypt   = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
-  role: {
-    type: String,
-    enum: ['ADMIN', 'OWNER'], // Restricts values to strictly these two
-    required: [true, 'A valid user role is required']
+const userSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, required: true, trim: true },
+    email:    { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: true },
+    role:     { type: String, enum: ['ADMIN', 'OWNER'], default: 'OWNER' },
+
+    // Owner subscription fields (null for ADMIN)
+    plan:                    { type: mongoose.Schema.Types.ObjectId, ref: 'Plan', default: null },
+    planStartDate:           { type: Date, default: null },
+    nextPaymentDue:          { type: Date, default: null },
+    ownerSubscriptionStatus: {
+      type:    String,
+      enum:    ['ACTIVE', 'OVERDUE', 'INACTIVE'],
+      default: 'ACTIVE',
+    },
   },
-  // 1. ADDED: Full Name field
-  fullName: {
-    type: String,
-    required: [true, 'Full name is required'],
-    trim: true
-  },
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true, // Creates a MongoDB index to ensure no duplicate emails
-    lowercase: true,
-    trim: true
-  },
-  // 2. ADDED: Contact Number field
-  contactNumber: {
-    type: String,
-    required: [true, 'Contact number is required']
-  },
-  password: {
-    type: String,
-    required: [true, 'Password is required']
-  }
-}, {
-  timestamps: true // Automatically manages 'createdAt' and 'updatedAt' fields
+  { timestamps: true }
+);
+
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
+  this.password = await bcrypt.hash(this.password, 12);
 });
 
-//-------------------------------------------------------------------------------------------------------------------------------------------
-
-// Pre-save hook: runs automatically right before doc.save() is executed
-userSchema.pre('save', async function() {
-  // If the password hasn't been changed, just return and do nothing
-  if (!this.isModified('password')) {
-    return; 
-  }
-  
-  // Hash the password
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
-
-// Instance method: allows us to call user.matchPassword('123456') in our controllers
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,119 +1,105 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const Tenant = require('../models/Tenant');
+const jwt              = require('jsonwebtoken');
+const User             = require('../models/User');
+const Tenant           = require('../models/Tenant');
+const Plan             = require('../models/Plan');
+const OwnerSubscription = require('../models/OwnerSubscription');
 
-/**
- * @desc    Authenticate admin & get token
- * @route   POST /auth/login
- * @access  Public
- */
+const generateToken = (id, role) =>
+  jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+/** POST /auth/login  — Admin login */
 const loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email, role: 'ADMIN' });
-
-    if (user && (await user.matchPassword(password))) {
-      const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
-      res.json({ _id: user._id, email: user.email, role: user.role, token: token });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+    if (!user || !(await user.matchPassword(password))) {
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error during authentication', error: error.message });
-  }
+    res.json({ _id: user._id, fullName: user.fullName, email: user.email, role: user.role, token: generateToken(user._id, 'ADMIN') });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
-/**
- * @desc    Authenticate owner & get token
- * @route   POST /auth/owner/login
- * @access  Public
- */
+/** POST /auth/owner/login  — Owner login */
 const loginOwner = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email, role: 'OWNER' });
-
-    if (user && (await user.matchPassword(password))) {
-      const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
-      res.json({ _id: user._id, email: user.email, role: user.role, token });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+    const user = await User.findOne({ email, role: 'OWNER' }).populate('plan', 'name price maxBoardingPlaces maxRoomsPerPlace');
+    if (!user || !(await user.matchPassword(password))) {
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error during authentication', error: error.message });
-  }
+    if (user.ownerSubscriptionStatus === 'INACTIVE') {
+      return res.status(403).json({ message: 'Your account has been deactivated. Contact admin.' });
+    }
+    res.json({
+      _id: user._id, fullName: user.fullName, email: user.email, role: user.role,
+      plan: user.plan, nextPaymentDue: user.nextPaymentDue,
+      token: generateToken(user._id, 'OWNER'),
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
-/**
- * @desc    Register a new Property Owner
- * @route   POST /auth/owner/register
- * @access  Public
- */
+/** POST /auth/owner/register  — Owner signup with plan */
 const registerOwner = async (req, res) => {
   try {
-    const { fullName, email, password, contactNumber } = req.body;
-
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists with this email' });
+    const { fullName, email, password, planId } = req.body;
+    if (!fullName || !email || !password || !planId) {
+      return res.status(400).json({ message: 'All fields including plan are required' });
     }
+
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: 'Email is already registered' });
+
+    const plan = await Plan.findById(planId);
+    if (!plan || !plan.isActive) return res.status(400).json({ message: 'Invalid or inactive plan selected' });
+
+    const planStartDate  = new Date();
+    const nextPaymentDue = new Date();
+    nextPaymentDue.setMonth(nextPaymentDue.getMonth() + 1);
 
     const user = await User.create({
-      fullName, email, password, contactNumber, role: 'OWNER' 
+      fullName, email, password, role: 'OWNER',
+      plan: plan._id, planStartDate, nextPaymentDue, ownerSubscriptionStatus: 'ACTIVE',
     });
 
-    if (user) {
-      const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
-      res.status(201).json({ _id: user._id, fullName: user.fullName, email: user.email, role: user.role, token: token });
-    } else {
-      res.status(400).json({ message: 'Invalid user data received' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error during registration', error: error.message });
-  }
+    // Create first subscription record
+    const monthKey  = `${planStartDate.getFullYear()}-${String(planStartDate.getMonth() + 1).padStart(2, '0')}`;
+    const monthName = planStartDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    await OwnerSubscription.create({
+      owner: user._id, monthName, monthKey, amountDue: plan.price,
+      dueDate: nextPaymentDue, status: 'PENDING',
+    });
+
+    res.status(201).json({
+      _id: user._id, fullName: user.fullName, email: user.email, role: user.role,
+      plan: { _id: plan._id, name: plan.name, price: plan.price },
+      nextPaymentDue,
+      token: generateToken(user._id, 'OWNER'),
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
-/**
- * @desc    Authenticate tenant & get token (Web Portal)
- * @route   POST /auth/tenant/login
- * @access  Public
- */
+/** POST /auth/tenant/login */
 const loginTenant = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // 1. Find the tenant and POPULATE their boarding place and room info for the dashboard
-    const tenant = await Tenant.findOne({ 
-      email, 
-      status: 'ACTIVE' 
-    })
-    .populate('boardingPlace', 'name')
-    .populate('room', 'roomNumber');
-
-    // 2. Verify password
-    if (tenant && (await tenant.matchPassword(password))) {
-      const token = jwt.sign(
-        { id: tenant._id, role: 'TENANT' }, 
-        process.env.JWT_SECRET, 
-        { expiresIn: '30d' } 
-      );
-
-      // 3. Send back a rich payload for the frontend state
-      res.json({
-        _id: tenant._id,
-        fullName: tenant.fullName,
-        email: tenant.email,
-        role: 'TENANT',
-        boardingPlace: tenant.boardingPlace,
-        room: tenant.room,
-        token: token
-      });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+    const tenant = await Tenant.findOne({ email }).populate('room', 'roomNumber').populate('boardingPlace', 'name');
+    if (!tenant || !(await tenant.matchPassword(password))) {
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error during tenant authentication', error: error.message });
-  }
+    res.json({
+      _id: tenant._id, fullName: tenant.fullName, email: tenant.email, role: 'TENANT',
+      room: tenant.room, boardingPlace: tenant.boardingPlace,
+      token: generateToken(tenant._id, 'TENANT'),
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
-module.exports = { loginAdmin, loginOwner, registerOwner, loginTenant };
+/** GET /admin/users — list all users (admin use) */
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password').populate('plan', 'name');
+    res.json(users);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+module.exports = { loginAdmin, loginOwner, registerOwner, loginTenant, getAllUsers };

@@ -1,56 +1,49 @@
 require('dotenv').config();
-const express = require('express');
+const express  = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const cors     = require('cors');
 
-// Route imports
-const authRoutes = require('./routes/authRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const boardingPlaceRoutes = require('./routes/boardingPlaceRoutes');
-const tenantRoutes = require('./routes/tenantRoutes');
-const costRoutes = require('./routes/costRoutes');
-const tenantPortalRoutes = require('./routes/tenantPortalRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-const depositRoutes = require('./routes/depositRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
+const authRoutes               = require('./routes/authRoutes');
+const adminRoutes              = require('./routes/adminRoutes');
+const boardingPlaceRoutes      = require('./routes/boardingPlaceRoutes');
+const tenantRoutes             = require('./routes/tenantRoutes');
+const costRoutes               = require('./routes/costRoutes');
+const tenantPortalRoutes       = require('./routes/tenantPortalRoutes');
+const uploadRoutes             = require('./routes/uploadRoutes');
+const depositRoutes            = require('./routes/depositRoutes');
+const paymentRoutes            = require('./routes/paymentRoutes');
+const planRoutes               = require('./routes/planRoutes');
+const ownerSubscriptionRoutes  = require('./routes/ownerSubscriptionRoutes');
+const rentRecordRoutes         = require('./routes/rentRecordRoutes');
+const notificationRoutes       = require('./routes/notificationRoutes');
 
-
-const startRentCronJob = require('./cron/rentGenerator');
-
-// Error middleware
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 const app = express();
-
-// Global Middleware
 app.use(express.json());
 app.use(cors());
 
-// Mount Routes
-app.use('/auth', authRoutes);
-app.use('/admin', adminRoutes);
+app.use('/auth',            authRoutes);
+app.use('/admin',           adminRoutes);
+app.use('/admin',           ownerSubscriptionRoutes);  // /admin/owners, /admin/owner-subscriptions
 app.use('/boarding-places', boardingPlaceRoutes);
-app.use('/tenants', tenantRoutes);
-app.use('/costs', costRoutes);
-app.use('/upload', require('./routes/uploadRoutes'));
-app.use('/payments', paymentRoutes);
-app.use('/deposits', depositRoutes);
-app.use('/notifications', notificationRoutes); 
-app.use('/portal', require('./routes/tenantPortalRoutes'));
+app.use('/tenants',         tenantRoutes);
+app.use('/costs',           costRoutes);
+app.use('/portal',          tenantPortalRoutes);
+app.use('/upload',          uploadRoutes);
+app.use('/deposits',        depositRoutes);
+app.use('/payments',        paymentRoutes);
+app.use('/plans',           planRoutes);
+app.use('/rent-records',    rentRecordRoutes);
+app.use('/notifications',   notificationRoutes);
 
-// Error Handlers (must be last)
 app.use(notFound);
 app.use(errorHandler);
 
-// Database Connection & Server Initialization
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('✅ Connected to MongoDB successfully');
+    console.log('✅ Connected to MongoDB');
     const PORT = process.env.PORT || 5000;
-    startRentCronJob();
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
   })
-  .catch((error) => {
-    console.error('❌ MongoDB connection error:', error.message);
-    process.exit(1);
-  });
+  .catch(err => { console.error('❌ MongoDB error:', err.message); process.exit(1); });

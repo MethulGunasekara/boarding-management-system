@@ -4,28 +4,27 @@ import { AuthContext } from '../context/AuthContext';
 import { useLang } from '../context/LangContext';
 import {
   LayoutDashboard, Building2, PlusCircle, CheckSquare,
-  DoorOpen, LogOut, FileText,
+  DoorOpen, LogOut, FileText, CreditCard, Users,
 } from 'lucide-react';
 
 const Sidebar = ({ onClose }) => {
   const { user, logout } = useContext(AuthContext);
-  const { t } = useLang();
+  const { t }    = useLang();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  const handleLogout = () => { logout(); navigate('/'); };
 
   const adminLinks = [
-    { to: '/admin/dashboard',    icon: LayoutDashboard, label: t('dashboard') },
-    { to: '/admin/add-property', icon: PlusCircle,      label: t('addProperty') },
+    { to: '/admin/dashboard',   icon: LayoutDashboard, label: t('dashboard') },
+    { to: '/admin/add-property', icon: PlusCircle,     label: t('addProperty') },
+    { to: '/admin/plans',        icon: CreditCard,     label: 'Subscription Plans' },
+    { to: '/admin/owners',       icon: Users,          label: 'Owner Accounts' },
   ];
 
   const ownerLinks = [
-    { to: '/owner/dashboard',  icon: LayoutDashboard, label: t('dashboard') },
-    { to: '/owner/approvals',  icon: CheckSquare,     label: t('paymentApprovals') },
-    { to: '/owner/add-property', icon: PlusCircle,    label: t('addProperty') },
+    { to: '/owner/dashboard',    icon: LayoutDashboard, label: t('dashboard') },
+    { to: '/owner/approvals',    icon: CheckSquare,     label: t('paymentApprovals') },
+    { to: '/owner/add-property', icon: PlusCircle,      label: t('addProperty') },
   ];
 
   const tenantLinks = [
@@ -39,18 +38,14 @@ const Sidebar = ({ onClose }) => {
 
   return (
     <aside className="bms-sidebar">
-      {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <DoorOpen size={20} />
-        </div>
+        <div className="sidebar-logo-icon"><DoorOpen size={20} /></div>
         <div>
           <span className="sidebar-logo-text">BMS</span>
           <span className="sidebar-logo-sub">Management System</span>
         </div>
       </div>
 
-      {/* User chip */}
       <div className="sidebar-user">
         <div className="sidebar-user-avatar">
           {(user?.email || user?.fullName || '?').charAt(0).toUpperCase()}
@@ -61,16 +56,13 @@ const Sidebar = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Nav links */}
       <nav className="sidebar-nav">
         {links.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             onClick={onClose}
-            className={({ isActive }) =>
-              `sidebar-link${isActive ? ' sidebar-link-active' : ''}`
-            }
+            className={({ isActive }) => `sidebar-link${isActive ? ' sidebar-link-active' : ''}`}
           >
             <Icon size={17} />
             {label}
@@ -78,11 +70,9 @@ const Sidebar = ({ onClose }) => {
         ))}
       </nav>
 
-      {/* Logout */}
       <div className="sidebar-footer">
         <button onClick={handleLogout} className="sidebar-logout">
-          <LogOut size={17} />
-          {t('logout')}
+          <LogOut size={17} /> {t('logout')}
         </button>
       </div>
     </aside>
