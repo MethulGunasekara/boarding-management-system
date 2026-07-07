@@ -1,7 +1,7 @@
 const express  = require('express');
 const router   = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { uploadMiddleware } = require('../middleware/uploadMiddleware');
+const uploadMiddleware = require('../middleware/uploadMiddleware');
 const { uploadImage }      = require('../utils/cloudinary');
 
 /**
@@ -16,6 +16,7 @@ router.post('/', protect, uploadMiddleware.single('image'), async (req, res) => 
       return res.status(400).json({ message: 'No image file provided' });
     }
 
+    // Dynamic folder assignment based on user role
     const folder = req.user.role === 'TENANT' ? 'bms/payment-proofs' : 'bms/tenant-docs';
     const url    = await uploadImage(req.file.buffer, folder);
 
