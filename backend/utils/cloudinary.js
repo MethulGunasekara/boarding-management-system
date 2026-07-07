@@ -1,28 +1,58 @@
 const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
 
-// Configure with your Cloudinary credentials from .env
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const uploadImage = (fileBuffer, folderName) => {
+/**
+ * Upload a buffer directly to Cloudinary.
+ */
+const uploadImage = (fileBuffer, folder) => {
   return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      { folder: folderName },
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
       (error, result) => {
-        if (result) {
-          resolve(result.secure_url);
-        } else {
-          reject(error);
-        }
+        if (error) return reject(error);
+        resolve(result.secure_url);
       }
     );
-    // Convert the buffer to a readable stream and pipe it to Cloudinary
-    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+    stream.end(fileBuffer);
   });
 };
 
-module.exports = { uploadImage };
+/**
+ * Extract the Cloudinary public_id from a secure_url.
+ * e.g. https://res.cloudinary.com/demo/image/upload/v123/bms/nic-cards/abc123.jpg
+ * → bms/nic-cards/abc123
+ */
+const extractPublicId = (url) => {
+  if (!url) return null;
+  try {
+    // Find the upload/ segment and take everything after it, strip version if present
+    const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z]+$/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Delete a single image from Cloudinary by its URL.
+ * Non-fatal — logs but does not throw.
+ */
+const deleteImage = async (url) => {
+  const publicId = extractPublicId(url);
+  if (!publicId) return;
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch (err) {
+    console.error(`Cloudinary delete failed for ${publicId}:`, err.message);
+  }
+};
+
+/**
+ * Delete multiple images concurrently. Ignores empty/null URLs.
+ */
+const deleteImages = async (urls = []) => {
+  const valid = urls.filter(Boolean);
+  if (!valid.length) return;
+  await Promise.all(valid.map(deleteImage));
+};
+
+module.exports = { uploadImage, deleteImage, deleteImages };

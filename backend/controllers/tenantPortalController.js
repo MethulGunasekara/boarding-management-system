@@ -1,66 +1,60 @@
+const Tenant     = require('../models/Tenant');
 const ChargeLine = require('../models/ChargeLine');
+const Payment    = require('../models/Payment');
 
-/**
- * @desc    Get logged-in tenant's charges and balance
- * @route   GET /portal/my-charges
- * @access  Private/Tenant
- */
+/** GET /portal/my-charges */
 const getMyCharges = async (req, res) => {
   try {
-    // req.user._id comes from your JWT token authentication middleware!
     const charges = await ChargeLine.find({ tenant: req.user._id })
-      .populate('costReference', 'title') // If it's a shared utility, get the title
+      .populate('costReference', 'title')
       .sort({ dueDate: -1 });
-
-    // Calculate total outstanding
-    const totalDue = charges
-      .filter(c => c.status === 'PENDING')
-      .reduce((sum, c) => sum + c.amountDue, 0);
-
+    const totalDue = charges.filter(c => ['PENDING', 'OVERDUE'].includes(c.status)).reduce((s, c) => s + c.amountDue, 0);
     res.json({ charges, totalDue });
-  } catch (error) {
-    console.error("Portal Error:", error);
-    res.status(500).json({ message: 'Failed to load your bills' });
-  }
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
-/**
- * @desc    Submit proof of payment for a specific bill
- * @route   POST /portal/charges/:id/pay
- * @access  Private/Tenant
- */
-const submitPaymentProof = async (req, res) => {
+
+/** GET /portal/my-payments */
+const getMyPayments = async (req, res) => {
   try {
-    const chargeId = req.params.id;
+    const payments = await Payment.find({ tenant: req.user._id }).sort({ paidOn: -1 });
+    res.json(payments);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+/** POST /portal/charges/:id/pay  — tenant submits payment proof */
+const submitPayment = async (req, res) => {
+  try {
     const { proofUrl } = req.body;
+    const charge = await ChargeLine.findOne({ _id: req.params.id, tenant: req.user._id });
+    if (!charge) return res.status(404).json({ message: 'Charge not found' });
+    if (charge.status !== 'PENDING') return res.status(400).json({ message: 'This charge is not pending' });
 
-    if (!proofUrl) {
-      return res.status(400).json({ message: 'Payment proof image is required' });
-    }
-
-    // 1. Find the charge and ensure it belongs to THIS logged-in tenant
-    const charge = await ChargeLine.findOne({
-      _id: chargeId,
-      tenant: req.user._id
-    });
-
-    if (!charge) {
-      return res.status(404).json({ message: 'Bill not found or unauthorized' });
-    }
-
-    if (charge.status === 'PAID') {
-      return res.status(400).json({ message: 'This bill is already paid.' });
-    }
-
-    // 2. Update the bill with the image and change the status
-    charge.status = 'UNDER_REVIEW';
+    charge.status          = 'UNDER_REVIEW';
     charge.proofOfPaymentUrl = proofUrl;
     await charge.save();
-
-    res.json({ message: 'Payment submitted for review successfully', charge });
-  } catch (error) {
-    console.error("Payment Submission Error:", error);
-    res.status(500).json({ message: 'Failed to submit payment' });
-  }
+    res.json(charge);
+  } catch (e) { res.status(500).json({ message: e.message }); }
 };
 
-module.exports = { getMyCharges, submitPaymentProof };
+/** PATCH /portal/change-password */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ message: 'Both current and new password are required' });
+    if (newPassword.length < 6)
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+
+    const tenant = await Tenant.findById(req.user._id);
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    const isMatch = await tenant.matchPassword(currentPassword);
+    if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
+
+    tenant.password = newPassword; // pre-save hook will hash it
+    await tenant.save();
+    res.json({ message: 'Password updated successfully' });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+module.exports = { getMyCharges, getMyPayments, submitPayment, changePassword };

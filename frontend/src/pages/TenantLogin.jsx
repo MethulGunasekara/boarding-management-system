@@ -7,14 +7,27 @@ import { useTheme } from '../context/ThemeContext';
 import { useLang } from '../context/LangContext';
 import { DoorOpen, Moon, Sun, Languages, Eye, EyeOff } from 'lucide-react';
 
+// Only import GoogleLogin if a client ID is actually configured
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const googleEnabled = !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'your_google_client_id_here';
+
+let GoogleLogin = null;
+if (googleEnabled) {
+  // Dynamic import to avoid errors when not configured
+  try {
+    const mod = await import('@react-oauth/google').catch(() => null);
+    if (mod) GoogleLogin = mod.GoogleLogin;
+  } catch { /* Google not available */ }
+}
+
 const TenantLogin = () => {
-  const [email, setEmail]       = useState('');
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading]   = useState(false);
+  const [loading,  setLoading]  = useState(false);
 
   const { login }       = useAuth();
-  const { dark, toggle: toggleTheme }  = useTheme();
+  const { dark, toggle: toggleTheme }   = useTheme();
   const { lang, toggle: toggleLang, t } = useLang();
   const navigate = useNavigate();
 
@@ -24,12 +37,23 @@ const TenantLogin = () => {
     try {
       const res = await axiosInstance.post('/auth/tenant/login', { email, password });
       login(res.data);
-      toast.success(`Welcome back, ${res.data.fullName}!`);
+      toast.success(`${t('welcomeBack')}, ${res.data.fullName}!`);
       navigate('/tenant/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Invalid email or password');
-    } finally {
-      setLoading(false);
+    } finally { setLoading(false); }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const res = await axiosInstance.post('/auth/tenant/google', {
+        credential: credentialResponse.credential,
+      });
+      login(res.data);
+      toast.success(`${t('welcomeBack')}, ${res.data.fullName}!`);
+      navigate('/tenant/dashboard');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Google sign-in failed.');
     }
   };
 
@@ -39,8 +63,7 @@ const TenantLogin = () => {
       {/* Controls */}
       <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.5rem' }}>
         <button className="navbar-btn" onClick={toggleLang}>
-          <Languages size={14} />
-          {lang === 'en' ? 'සිං' : 'EN'}
+          <Languages size={14} />{lang === 'en' ? 'සිං' : 'EN'}
         </button>
         <button className="navbar-btn" onClick={toggleTheme}>
           {dark ? <Sun size={16} /> : <Moon size={16} />}
@@ -48,20 +71,48 @@ const TenantLogin = () => {
       </div>
 
       <div style={{ width: '100%', maxWidth: 400 }}>
+        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ width: 52, height: 52, background: 'linear-gradient(135deg,#724cf9,#ca7df9)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
             <DoorOpen size={26} color="#fff" />
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>{t('tenantPortal')}</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Sign in to manage your stay and view your bills.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{t('tenantSignIn')}</p>
         </div>
 
         <div className="card">
+          {/* Google sign-in — only shown when properly configured */}
+          {googleEnabled && GoogleLogin && (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => toast.error('Google sign-in failed. Please use email and password.')}
+                  width="100%"
+                  text="signin_with"
+                  shape="rectangular"
+                  theme={dark ? 'filled_black' : 'outline'}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('orDivider')}</span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+              </div>
+            </>
+          )}
+
           <form onSubmit={handleLogin}>
             <div className="form-group">
               <label className="form-label">{t('email')}</label>
-              <input type="email" className="form-input" placeholder="Enter your email"
-                value={email} onChange={e => setEmail(e.target.value)} required />
+              <input
+                type="email"
+                className="form-input"
+                placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
             </div>
 
             <div className="form-group" style={{ marginBottom: '1.5rem', position: 'relative' }}>
@@ -75,21 +126,31 @@ const TenantLogin = () => {
                 style={{ paddingRight: '2.5rem' }}
                 required
               />
-              <button type="button" onClick={() => setShowPass(p => !p)}
-                style={{ position: 'absolute', right: '0.75rem', top: '2rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button
+                type="button"
+                onClick={() => setShowPass(p => !p)}
+                style={{ position: 'absolute', right: '0.75rem', top: '2rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.75rem' }} disabled={loading}>
-              {loading ? t('loading') : t('signIn')}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '0.75rem' }}
+              disabled={loading}
+            >
+              {loading ? t('signingIn') : t('signIn')}
             </button>
           </form>
         </div>
 
         <p style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
           Are you an owner?{' '}
-          <Link to="/" style={{ color: 'var(--primary)', fontWeight: 600 }}>Owner / Admin Login →</Link>
+          <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+            Owner / Admin Login →
+          </Link>
         </p>
       </div>
     </div>

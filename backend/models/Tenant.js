@@ -1,80 +1,58 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const bcrypt   = require('bcryptjs');
 
-const tenantSchema = new mongoose.Schema({
-  boardingPlace: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'BoardingPlace',
-    required: [true, 'Tenant must be linked to a boarding place for security scoping']
-  },
-  room: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Room',
-    required: [true, 'Tenant must be assigned to a room']
-  },
-  fullName: {
-    type: String,
-    required: [true, 'Full name is required'],
-    trim: true
-  },
-  email: {
-    type: String,
-    required: [true, 'Email is required for portal login'],
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-  password: {
-    type: String,
-    required: [true, 'Password is required for portal login']
-  },
-  address: { type: String, required: true },
-  nicNumber: { type: String, required: true, unique: true },
-  contactNumber: { type: String, required: true },
-  courseOrWorkplace: { type: String, required: true },
-  monthlyRent: {
-    type: Number,
-    required: [true, 'Monthly rent amount is required for the automated billing engine']
-  },
-  
-  // Emergency Contact Sub-document structure for clean grouping
-  emergencyContact: {
-    name: { type: String, required: true },
-    number: { type: String, required: true }
-  },
+const tenantSchema = new mongoose.Schema(
+  {
+    // ── Required ──────────────────────────────────────────
+    fullName:      { type: String, required: true, trim: true },
+    email:         {
+      type: String, required: true, unique: true, lowercase: true, trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address'],
+    },
+    password:      { type: String },   // optional if using Google OAuth
+    googleId:      { type: String, default: null },
+    contactNumber: {
+      type: String, required: true, trim: true,
+      match: [/^(\+94|0)[0-9]{9}$/, 'Please provide a valid Sri Lankan phone number (e.g. 0771234567)'],
+    },
+    nicNumber:     { type: String, required: true, trim: true },
+    room:          { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
+    boardingPlace: { type: mongoose.Schema.Types.ObjectId, ref: 'BoardingPlace', required: true },
+    rentAmount:    { type: Number, required: true, default: 0 ,min: 0},
 
-  // File URLs (to be populated later via Cloudinary uploads)
-  idFrontImageUrl: { type: String, required: true },
-  idBackImageUrl: { type: String, required: true },
-  signatureImageUrl: { type: String, required: true },
+    // ── Optional ──────────────────────────────────────────
+    address:           { type: String, trim: true, default: '' },
+    courseOrWorkplace: { type: String, trim: true, default: '' },
+    emergencyContact: {
+      name:   { type: String, trim: true, default: '' },
+      number: {
+        type: String, trim: true, default: '',
+        validate: {
+          validator: v => !v || /^(\+94|0)[0-9]{9}$/.test(v),
+          message:   'Please provide a valid Sri Lankan phone number',
+        },
+      },
+    },
+    idFrontImageUrl:   { type: String, default: '' },
+    idBackImageUrl:    { type: String, default: '' },
+    signatureImageUrl: { type: String, default: '' },
 
-  admissionDate: {
-    type: Date,
-    required: true,
-    default: Date.now
+    // ── System fields ─────────────────────────────────────
+    admissionDate: { type: Date, default: Date.now },
+    status:        { type: String, enum: ['ACTIVE', 'MOVED_OUT'], default: 'ACTIVE' },
+    movedOutDate:  { type: Date, default: null },   // used by cleanup cron
   },
-  status: {
-    type: String,
-    enum: ['ACTIVE', 'MOVED_OUT'], // Helps filter active tenants for billing
-    default: 'ACTIVE',
-    required: true
-  }
-}, {
-  timestamps: true
+  { timestamps: true }
+);
+
+tenantSchema.pre('save', async function () {
+  if (!this.isModified('password') || !this.password) return;
+  this.password = await bcrypt.hash(this.password, 12);
 });
 
-// Pre-save hook for password hashing
-tenantSchema.pre('save', async function() {
-  if (!this.isModified('password')) {
-    return;
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
-
-// --- ADDED: Instance method to compare passwords ---
-tenantSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+tenantSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 module.exports = mongoose.model('Tenant', tenantSchema);
