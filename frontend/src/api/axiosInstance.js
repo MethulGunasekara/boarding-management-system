@@ -2,8 +2,7 @@ import axios from 'axios';
 
 // Create a custom Axios instance
 const axiosInstance = axios.create({
-  // Matches the port in your Express server.js
-  baseURL: 'http://localhost:5000', 
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
 });
 
 // REQUEST INTERCEPTOR: Automatically attach the JWT token
