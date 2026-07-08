@@ -84,17 +84,23 @@ const TenantLogin = () => {
           {/* Google sign-in — only shown when properly configured */}
           {googleEnabled && GoogleLogin && (
             <>
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ 
+                marginBottom: '1.25rem', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                width: '100%' 
+              }}>
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast.error('Google sign-in failed. Please use email and password.')}
-                  width="100%"
+                  containerProps={{ style: { width: '100%' } }} // Scales the implicit internal wrapper element
+                  width="400" // Matches your tenant layout's explicit maxWidth dimension
                   text="signin_with"
                   shape="rectangular"
                   theme={dark ? 'filled_black' : 'outline'}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('orDivider')}</span>
                 <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />

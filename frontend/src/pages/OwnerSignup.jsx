@@ -139,31 +139,30 @@ const OwnerSignup = () => {
           <h3 className="section-title">{t('accountDetails')}</h3>
 
           {/* Google sign-in option */}
-          {!isGoogleSignup && (
+          {!isGoogleSignup ? (
             <>
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ 
+                marginBottom: '1.25rem', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                width: '100%' 
+              }}>
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast.error('Google sign-in failed.')}
-                  width="100%"
+                  containerProps={{ style: { width: '100%' } }} // Scales the hidden intermediate element wrapper
+                  width="496" // Fits flush with the form fields inside the card padding boundary
                   text="signup_with"
                   shape="rectangular"
                 />
               </div>
-              {isGoogleSignup && (
-                <div className="alert alert-success" style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
-                  ✓ Google account linked: <strong>{form.email}</strong>
-                </div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('orDivider')}</span>
                 <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
               </div>
             </>
-          )}
-
-          {isGoogleSignup && (
+          ) : (
             <div className="alert alert-success" style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
               ✓ Google account linked: <strong>{form.email}</strong>
             </div>
