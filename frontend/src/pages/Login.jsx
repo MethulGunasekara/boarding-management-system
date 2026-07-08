@@ -158,17 +158,23 @@ const Login = () => {
           {/* Google sign-in — owner only, only when configured */}
           {loginType === 'OWNER' && googleEnabled && GoogleLogin && (
             <>
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ 
+                marginBottom: '1.25rem', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                width: '100%' 
+              }}>
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast.error('Google sign-in failed. Please use email and password.')}
-                  width="100%"
+                  containerProps={{ style: { width: '100%' } }} // Force the internal iframe container wrapper to expand
+                  width="380" // Match your form's strict max-width integer pixel dimensions directly
                   text="signin_with"
                   shape="rectangular"
                   theme={dark ? 'filled_black' : 'outline'}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('orDivider')}</span>
                 <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
