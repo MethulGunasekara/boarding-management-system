@@ -1,12 +1,23 @@
 const cloudinary = require('cloudinary').v2;
 
+// Explicit config is more reliable than CLOUDINARY_URL auto-config on Render
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure:     true,
+});
+
 /**
  * Upload a buffer directly to Cloudinary.
+ * @param {Buffer} fileBuffer
+ * @param {string} folder - destination folder in Cloudinary
+ * @returns {Promise<string>} secure URL
  */
 const uploadImage = (fileBuffer, folder) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder },
+      { folder, resource_type: 'image' },
       (error, result) => {
         if (error) return reject(error);
         resolve(result.secure_url);
@@ -19,12 +30,11 @@ const uploadImage = (fileBuffer, folder) => {
 /**
  * Extract the Cloudinary public_id from a secure_url.
  * e.g. https://res.cloudinary.com/demo/image/upload/v123/bms/nic-cards/abc123.jpg
- * → bms/nic-cards/abc123
+ *   →  bms/nic-cards/abc123
  */
 const extractPublicId = (url) => {
   if (!url) return null;
   try {
-    // Find the upload/ segment and take everything after it, strip version if present
     const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z]+$/);
     return match ? match[1] : null;
   } catch {

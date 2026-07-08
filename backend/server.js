@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+// ── Startup config check ───────────────────────────────────────────────────
+const required = ['MONGO_URI', 'JWT_SECRET', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
+required.forEach(key => {
+  if (!process.env[key]) {
+    console.error(`❌ Missing required environment variable: ${key}`);
+  }
+});
+
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
