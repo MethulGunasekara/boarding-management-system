@@ -150,8 +150,8 @@ const OwnerSignup = () => {
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast.error('Google sign-in failed.')}
-                  containerProps={{ style: { width: '100%' } }} // Scales the hidden intermediate element wrapper
-                  width="496" // Fits flush with the form fields inside the card padding boundary
+                  containerProps={{ style: { width: '100%', display: 'flex', justifyContent: 'center' } }}
+                  width="400" 
                   text="signup_with"
                   shape="rectangular"
                 />

@@ -93,8 +93,8 @@ const TenantLogin = () => {
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast.error('Google sign-in failed. Please use email and password.')}
-                  containerProps={{ style: { width: '100%' } }} // Scales the implicit internal wrapper element
-                  width="400" // Matches your tenant layout's explicit maxWidth dimension
+                  containerProps={{ style: { width: '100%', display: 'flex', justifyContent: 'center' } }}
+                  width="340" // Fits perfectly inside the card padding
                   text="signin_with"
                   shape="rectangular"
                   theme={dark ? 'filled_black' : 'outline'}
